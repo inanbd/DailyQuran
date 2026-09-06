@@ -1,0 +1,504 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../app/edition_providers.dart';
+import '../../app/providers.dart';
+import '../../app/routes.dart';
+import '../../core/utils/formatting.dart';
+import '../../domain/entities/enums.dart';
+import '../../domain/entities/notification_preferences.dart';
+import '../../domain/entities/quran_edition.dart';
+import '../../shared/theme/app_colors.dart';
+import '../../shared/theme/app_spacing.dart';
+import '../../shared/theme/app_typography.dart';
+import '../../shared/widgets/app_page.dart';
+import '../../shared/widgets/notice_banner.dart';
+import '../../shared/widgets/settings_group.dart';
+import '../../shared/widgets/state_views.dart';
+import '../settings/reminder_permission_flow.dart';
+import '../settings/settings_labels.dart';
+import '../today/today_controller.dart';
+
+/// Three short steps: why, which translation, when.
+///
+/// No account, no permission prompt on launch. The OS notification prompt is
+/// raised at the end of step three, once the reader has said when they want to
+/// be reminded and can see why it is being asked for.
+class OnboardingScreen extends ConsumerStatefulWidget {
+  const OnboardingScreen({super.key});
+
+  @override
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
+  static const String _recommendedEditionId = 'saheeh_international';
+
+  int _step = 0;
+  String? _editionId;
+  bool _remindersEnabled = true;
+  NotificationFrequency _frequency = NotificationFrequency.daily;
+  Set<int> _weekdays = <int>{1, 2, 3, 4, 5, 6, 7};
+  TimeOfDayValue _time = TimeOfDayValue.defaultTime;
+  LanguageMode _language = LanguageMode.both;
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final AsyncValue<List<QuranEdition>> editions =
+        ref.watch(browsableEditionsProvider);
+
+    return AppPage(
+      title: _title,
+      subtitle: 'Step ${_step + 1} of 3',
+      child: switch (_step) {
+        0 => _WelcomeStep(onContinue: () => setState(() => _step = 1)),
+        1 => _ChooseEditionStep(
+            editions: editions,
+            selectedId: _resolveSelection(editions.value),
+            onSelected: (String id) => setState(() => _editionId = id),
+            onContinue: _resolveSelection(editions.value) == null
+                ? null
+                : () => setState(() => _step = 2),
+            onBack: () => setState(() => _step = 0),
+          ),
+        _ => _ReminderStep(
+            remindersEnabled: _remindersEnabled,
+            frequency: _frequency,
+            weekdays: _weekdays,
+            time: _time,
+            language: _language,
+            saving: _saving,
+            onRemindersChanged: (bool value) =>
+                setState(() => _remindersEnabled = value),
+            onFrequencyChanged: (NotificationFrequency value) =>
+                setState(() => _frequency = value),
+            onWeekdaysChanged: (Set<int> value) =>
+                setState(() => _weekdays = value),
+            onTimeChanged: (TimeOfDayValue value) =>
+                setState(() => _time = value),
+            onLanguageChanged: (LanguageMode value) =>
+                setState(() => _language = value),
+            onBack: () => setState(() => _step = 1),
+            onFinish: () => _finish(editions.value),
+          ),
+      },
+    );
+  }
+
+  String get _title {
+    switch (_step) {
+      case 0:
+        return 'An ayah at a time';
+      case 1:
+        return 'Choose your translation';
+      default:
+        return 'Choose your reminder';
+    }
+  }
+
+  /// The chosen edition, defaulting to the recommended one when it can be read
+  /// and otherwise to the first readable edition.
+  String? _resolveSelection(List<QuranEdition>? editions) {
+    final String? chosen = _editionId;
+    if (chosen != null) return chosen;
+    if (editions == null || editions.isEmpty) return null;
+
+    for (final QuranEdition edition in editions) {
+      if (edition.id == _recommendedEditionId && edition.isReadable) {
+        return edition.id;
+      }
+    }
+    for (final QuranEdition edition in editions) {
+      if (edition.isReadable) return edition.id;
+    }
+    return null;
+  }
+
+  Future<void> _finish(List<QuranEdition>? editions) async {
+    final String? editionId = _resolveSelection(editions);
+    if (editionId == null || _saving) return;
+
+    setState(() => _saving = true);
+    // The permission prompts below suspend this method for as long as the
+    // reader takes to answer, and this screen does not necessarily survive
+    // that. Reached through the container, the remaining steps finish either
+    // way.
+    final ProviderContainer container =
+        ProviderScope.containerOf(context, listen: false);
+    try {
+      // Language and edition now — but deliberately *not* `onboardingComplete`.
+      // That flag is what the router redirects on, so setting it here would
+      // tear this screen down while the OS permission dialog was still sitting
+      // on top of it, and the rest of onboarding would never be saved.
+      await container.read(userPreferencesProvider.notifier).update(
+            container.read(userPreferencesProvider).copyWith(
+                  languageMode: _language,
+                  currentEditionId: editionId,
+                ),
+          );
+
+      if (_remindersEnabled && mounted) {
+        // The permission prompts land here — after the reader has picked a
+        // time, never on first launch. Declining any of them still finishes
+        // onboarding; the notification settings screen offers them again.
+        await ReminderPermissionFlow.run(context);
+      }
+
+      // Saving notification preferences also arms (or clears) the reminders.
+      await container.read(notificationPreferencesProvider.notifier).update(
+            NotificationPreferences(
+              enabled: _remindersEnabled,
+              frequency: _frequency,
+              selectedWeekdays: _weekdays,
+              time: _time,
+              anchorDate: DateTime.now(),
+            ),
+          );
+
+      // Last, because it is what sends the reader on to Today.
+      await container
+          .read(userPreferencesProvider.notifier)
+          .completeOnboarding();
+      await container.read(todayControllerProvider.notifier).refresh();
+      if (mounted) context.go(Routes.today);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+}
+
+class _WelcomeStep extends StatelessWidget {
+  const _WelcomeStep({required this.onContinue});
+
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // The first thing the app says is a greeting, before it says anything
+        // about itself.
+        Text(
+          'السلام عليكم',
+          textAlign: TextAlign.start,
+          style: AppTypography.arabicTitle.copyWith(color: colors.accent),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Assalamu alaikum',
+          style: AppTypography.translationBody.copyWith(
+            color: colors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Text(
+          'Read the Qur’an through at your own pace, one ayah at a time.',
+          style: AppTypography.translationBody
+              .copyWith(color: colors.textPrimary),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Text(
+          'One ayah at a time, at the time that works best for you. Your place '
+          'is saved, and nothing is marked read unless you read it.',
+          style: AppTypography.body.copyWith(color: colors.textSecondary),
+        ),
+        const SizedBox(height: AppSpacing.xxxl),
+        FilledButton(onPressed: onContinue, child: const Text('Continue')),
+      ],
+    );
+  }
+}
+
+class _ChooseEditionStep extends StatelessWidget {
+  const _ChooseEditionStep({
+    required this.editions,
+    required this.selectedId,
+    required this.onSelected,
+    required this.onContinue,
+    required this.onBack,
+  });
+
+  final AsyncValue<List<QuranEdition>> editions;
+  final String? selectedId;
+  final ValueChanged<String> onSelected;
+  final VoidCallback? onContinue;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = context.colors;
+
+    return editions.when(
+      loading: () => const LoadingView(),
+      error: (Object error, StackTrace stack) => const ErrorStateView(
+        title: 'The library could not be loaded',
+        message: 'The list of editions is missing. Reinstalling the app '
+            'restores it.',
+      ),
+      data: (List<QuranEdition> value) {
+        final List<QuranEdition> readable =
+            value.where((QuranEdition e) => e.isReadable).toList();
+        if (readable.isEmpty) {
+          return const ErrorStateView(
+            title: 'No editions are installed',
+            message: 'No Qur’an text has been added to this build of the app '
+                'yet.',
+            detail: 'See DATA_SOURCES.md for how to import a verified edition.',
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              'You can change this at any time, and your place carries across '
+              'translations.',
+              style: AppTypography.body.copyWith(color: colors.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            SettingsGroup(
+              title: 'Translations',
+              children: <Widget>[
+                for (final QuranEdition edition in readable)
+                  ChoiceRow<String>(
+                    label: edition.titleEnglish,
+                    description: _describe(edition),
+                    value: edition.id,
+                    groupValue: selectedId ?? '',
+                    onChanged: onSelected,
+                  ),
+              ],
+            ),
+            if (value.length > readable.length) ...<Widget>[
+              const SizedBox(height: AppSpacing.lg),
+              const NoticeBanner(
+                message: 'Some editions in the catalog have no text installed '
+                    'yet and are not listed here.',
+              ),
+            ],
+            const SizedBox(height: AppSpacing.xxl),
+            FilledButton(onPressed: onContinue, child: const Text('Continue')),
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(onPressed: onBack, child: const Text('Back')),
+          ],
+        );
+      },
+    );
+  }
+
+  static String _describe(QuranEdition edition) {
+    final StringBuffer buffer = StringBuffer();
+    if (edition.translator.isNotEmpty) buffer.write('${edition.translator} · ');
+    buffer.write('${Formatting.count(edition.totalAyah)} ayat');
+    if (edition.isFixture) {
+      buffer.write(' · development data, not the Qur’an');
+    }
+    return buffer.toString();
+  }
+}
+
+class _ReminderStep extends StatelessWidget {
+  const _ReminderStep({
+    required this.remindersEnabled,
+    required this.frequency,
+    required this.weekdays,
+    required this.time,
+    required this.language,
+    required this.saving,
+    required this.onRemindersChanged,
+    required this.onFrequencyChanged,
+    required this.onWeekdaysChanged,
+    required this.onTimeChanged,
+    required this.onLanguageChanged,
+    required this.onBack,
+    required this.onFinish,
+  });
+
+  final bool remindersEnabled;
+  final NotificationFrequency frequency;
+  final Set<int> weekdays;
+  final TimeOfDayValue time;
+  final LanguageMode language;
+  final bool saving;
+  final ValueChanged<bool> onRemindersChanged;
+  final ValueChanged<NotificationFrequency> onFrequencyChanged;
+  final ValueChanged<Set<int>> onWeekdaysChanged;
+  final ValueChanged<TimeOfDayValue> onTimeChanged;
+  final ValueChanged<LanguageMode> onLanguageChanged;
+  final VoidCallback onBack;
+  final VoidCallback onFinish;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = context.colors;
+    final bool use24Hour = MediaQuery.alwaysUse24HourFormatOf(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          'Receive one ayah at a time, at the time that works best for you.',
+          style: AppTypography.body.copyWith(color: colors.textSecondary),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        SettingsGroup(
+          title: 'Reminder',
+          children: <Widget>[
+            SettingsRow(
+              label: 'Remind me',
+              trailing: Switch(
+                value: remindersEnabled,
+                onChanged: onRemindersChanged,
+              ),
+            ),
+            if (remindersEnabled) ...<Widget>[
+              SettingsRow(
+                label: 'Time',
+                value: Formatting.timeOfDay(
+                  time.hour,
+                  time.minute,
+                  use24Hour: use24Hour,
+                ),
+                onTap: () => _pickTime(context),
+              ),
+            ],
+          ],
+        ),
+        if (remindersEnabled) ...<Widget>[
+          const SizedBox(height: AppSpacing.xl),
+          SettingsGroup(
+            title: 'Frequency',
+            children: <Widget>[
+              for (final NotificationFrequency option
+                  in <NotificationFrequency>[
+                NotificationFrequency.daily,
+                NotificationFrequency.selectedDays,
+                NotificationFrequency.weekly,
+              ])
+                ChoiceRow<NotificationFrequency>(
+                  label: SettingsLabels.frequencyName(option),
+                  value: option,
+                  groupValue: frequency,
+                  onChanged: onFrequencyChanged,
+                ),
+            ],
+          ),
+          if (frequency == NotificationFrequency.selectedDays ||
+              frequency == NotificationFrequency.weekly) ...<Widget>[
+            const SizedBox(height: AppSpacing.lg),
+            _OnboardingWeekdays(
+              weekdays: weekdays,
+              single: frequency == NotificationFrequency.weekly,
+              onChanged: onWeekdaysChanged,
+            ),
+          ],
+        ],
+        const SizedBox(height: AppSpacing.xl),
+        SettingsGroup(
+          title: 'Ayah text',
+          children: <Widget>[
+            for (final LanguageMode mode in LanguageMode.values)
+              ChoiceRow<LanguageMode>(
+                label: SettingsLabels.language(mode),
+                value: mode,
+                groupValue: language,
+                onChanged: onLanguageChanged,
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        FilledButton(
+          onPressed: saving ? null : onFinish,
+          child: Text(saving ? 'Setting up…' : 'Start reading'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        TextButton(onPressed: saving ? null : onBack, child: const Text('Back')),
+      ],
+    );
+  }
+
+  Future<void> _pickTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: time.hour, minute: time.minute),
+      helpText: 'Reminder time',
+    );
+    if (picked == null) return;
+    onTimeChanged(TimeOfDayValue(picked.hour, picked.minute));
+  }
+}
+
+class _OnboardingWeekdays extends StatelessWidget {
+  const _OnboardingWeekdays({
+    required this.weekdays,
+    required this.single,
+    required this.onChanged,
+  });
+
+  final Set<int> weekdays;
+  final bool single;
+  final ValueChanged<Set<int>> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = context.colors;
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: <Widget>[
+        for (int weekday = 1; weekday <= 7; weekday++)
+          Semantics(
+            selected: weekdays.contains(weekday),
+            button: true,
+            label: Formatting.fullWeekday(weekday),
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: () {
+                if (single) {
+                  onChanged(<int>{weekday});
+                  return;
+                }
+                final Set<int> next = <int>{...weekdays};
+                if (!next.remove(weekday)) next.add(weekday);
+                if (next.isEmpty) return;
+                onChanged(next);
+              },
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTapTarget,
+                  minHeight: AppSpacing.minTapTarget,
+                ),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: weekdays.contains(weekday)
+                      ? colors.accentSoft
+                      : colors.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: weekdays.contains(weekday)
+                        ? colors.accent
+                        : colors.border,
+                  ),
+                ),
+                child: Text(
+                  Formatting.shortWeekday(weekday),
+                  style: AppTypography.metadata.copyWith(
+                    color: weekdays.contains(weekday)
+                        ? colors.accent
+                        : colors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}

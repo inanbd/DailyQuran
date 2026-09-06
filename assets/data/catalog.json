@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "notice": "Bibliographic metadata for the editions the app can read. An edition becomes readable when a matching file exists at assets/data/editions/<slug>.json. No Qur'an text is stored in this file. See DATA_SOURCES.md for how to import a verified edition.",
+  "editions": [
+    {
+      "id": "dev_sample",
+      "slug": "dev_sample",
+      "titleEnglish": "Development Sample",
+      "titleArabic": "",
+      "translator": "Daily Quran development fixture",
+      "description": "Placeholder text used to exercise the reading experience during development. This is not the Qur'an, not a translation of it, and not part of any edition. It exists so the app is runnable straight after checkout, before any dataset has been imported.",
+      "languageName": "English",
+      "languageCode": "en-US",
+      "totalAyah": 60,
+      "verification": "development_fixture",
+      "source": {
+        "name": "Daily Quran development fixture",
+        "licence": "Part of this repository"
+      }
+    },
+    {
+      "id": "arabic_uthmani",
+      "slug": "arabic_uthmani",
+      "titleEnglish": "Arabic only (Uthmani)",
+      "titleArabic": "القرآن الكريم",
+      "translator": "",
+      "description": "The Arabic text of the mushaf in Uthmani orthography, with no translation. For readers who want the Arabic alone.",
+      "languageName": "Arabic",
+      "languageCode": "ar-SA",
+      "languageDirection": "rtl",
+      "totalAyah": 6236,
+      "progressScope": "quran",
+      "verification": "verified",
+      "source": {
+        "name": "Not yet imported"
+      }
+    },
+    {
+      "id": "saheeh_international",
+      "slug": "saheeh_international",
+      "titleEnglish": "Saheeh International",
+      "titleArabic": "القرآن الكريم",
+      "translator": "Umm Muhammad (Saheeh International)",
+      "description": "A widely used contemporary English translation, known for plain modern phrasing and close adherence to the Arabic.",
+      "languageName": "English",
+      "languageCode": "en-US",
+      "totalAyah": 6236,
+      "progressScope": "quran",
+      "verification": "verified",
+      "source": {
+        "name": "quran-json (Risan Bagja Pradana); Uthmani text from The Noble Qur'an Encyclopedia, translations from Tanzil.net",
+        "url": "https://github.com/risan/quran-json",
+        "translator": "Umm Muhammad (Saheeh International)",
+        "licence": "CC BY-SA 4.0",
+        "retrievedAt": "2026-09-06T20:53:54.438095Z"
+      }
+    },
+    {
+      "id": "maududi",
+      "slug": "maududi",
+      "titleEnglish": "Maududi (Urdu)",
+      "titleArabic": "القرآن الكريم",
+      "translator": "Abul A'la Maududi",
+      "description": "Tafhim al-Qur'an, the Urdu translation and commentary by Sayyid Abul A'la Maududi. Listed here partly because Urdu reads right-to-left: an edition declares its own direction, and the translation is laid out accordingly.",
+      "languageName": "Urdu",
+      "languageCode": "ur-PK",
+      "languageDirection": "rtl",
+      "totalAyah": 6236,
+      "progressScope": "quran",
+      "verification": "verified",
+      "source": {
+        "name": "Not yet imported"
+      }
+    },
+    {
+      "id": "hamidullah",
+      "slug": "hamidullah",
+      "titleEnglish": "Hamidullah (French)",
+      "titleArabic": "القرآن الكريم",
+      "translator": "Muhammad Hamidullah",
+      "description": "Le Saint Coran, the standard French translation by Muhammad Hamidullah, first published in 1959.",
+      "languageName": "French",
+      "languageCode": "fr-FR",
+      "totalAyah": 6236,
+      "progressScope": "quran",
+      "verification": "verified",
+      "source": {
+        "name": "Not yet imported"
+      }
+    },
+    {
+      "id": "garcia",
+      "slug": "garcia",
+      "titleEnglish": "García (Spanish)",
+      "titleArabic": "القرآن الكريم",
+      "translator": "Muhammad Isa García",
+      "description": "El Corán, the Spanish translation by Muhammad Isa García.",
+      "languageName": "Spanish",
+      "languageCode": "es-ES",
+      "totalAyah": 6236,
+      "progressScope": "quran",
+      "verification": "verified",
+      "source": {
+        "name": "Not yet imported"
+      }
+    },
+    {
+      "id": "kuliev",
+      "slug": "kuliev",
+      "titleEnglish": "Kuliev (Russian)",
+      "titleArabic": "القرآن الكريم",
+      "translator": "Elmir Kuliev",
+      "description": "The Russian translation by Elmir Kuliev, the most widely circulated Russian rendering of the Qur'an.",
+      "languageName": "Russian",
+      "languageCode": "ru-RU",
+      "totalAyah": 6236,
+      "progressScope": "quran",
+      "verification": "verified",
+      "source": {
+        "name": "Not yet imported"
+      }
+    },
+    {
+      "id": "muhiuddin_khan",
+      "slug": "muhiuddin_khan",
+      "titleEnglish": "Muhiuddin Khan (Bengali)",
+      "titleArabic": "القرآن الكريم",
+      "translator": "Muhiuddin Khan",
+      "description": "The Bengali translation by Muhiuddin Khan, the standard rendering in Bangladesh and West Bengal.",
+      "languageName": "Bengali",
+      "languageCode": "bn-BD",
+      "totalAyah": 6236,
+      "progressScope": "quran",
+      "verification": "verified",
+      "source": {
+        "name": "Not yet imported"
+      }
+    }
+  ]
+}

@@ -15,6 +15,11 @@ abstract final class ContentSchema {
   /// surah list works before any edition has been imported.
   static const String surahIndexAsset = 'assets/data/surahs.json';
 
+  /// The shared word-by-word index: every ayah's words with their glosses,
+  /// keyed by verse key. Glosses do not change with the translation being
+  /// read, so they live here once rather than in every edition file.
+  static const String wordByWordAsset = 'assets/data/word_by_word.json';
+
   /// Directory holding one JSON file per edition.
   static const String editionsDirectory = 'assets/data/editions';
 

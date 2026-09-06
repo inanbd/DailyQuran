@@ -73,6 +73,7 @@ class _FavouritesList extends ConsumerWidget {
             languageMode: preferences.languageMode,
             textScale: preferences.textSize.scale,
             showTransliteration: preferences.showTransliteration,
+            showWordByWord: preferences.showWordByWord,
             translationIsRightToLeft: edition?.isRightToLeft ?? false,
             speaking: speaking,
             canSpeak: canSpeak,
@@ -92,6 +93,7 @@ class _FavouriteCard extends ConsumerWidget {
     required this.languageMode,
     required this.textScale,
     required this.showTransliteration,
+    required this.showWordByWord,
     required this.translationIsRightToLeft,
     required this.speaking,
     required this.canSpeak,
@@ -102,6 +104,7 @@ class _FavouriteCard extends ConsumerWidget {
   final LanguageMode languageMode;
   final double textScale;
   final bool showTransliteration;
+  final bool showWordByWord;
   final bool translationIsRightToLeft;
   final SpokenUtterance? speaking;
   final bool canSpeak;
@@ -143,6 +146,7 @@ class _FavouriteCard extends ConsumerWidget {
             languageMode: languageMode,
             textScale: textScale,
             showTransliteration: showTransliteration,
+            showWordByWord: showWordByWord,
             translationIsRightToLeft: translationIsRightToLeft,
             // The citation is already in the card heading.
             showReference: false,

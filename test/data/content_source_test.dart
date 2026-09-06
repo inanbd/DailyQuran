@@ -4,6 +4,7 @@ import 'package:daily_quran/core/errors/app_exception.dart';
 import 'package:daily_quran/data/content/asset_quran_content_source.dart';
 import 'package:daily_quran/data/content/content_schema.dart';
 import 'package:daily_quran/domain/entities/ayah.dart';
+import 'package:daily_quran/domain/entities/ayah_word.dart';
 import 'package:daily_quran/domain/entities/enums.dart';
 import 'package:daily_quran/domain/entities/quran_edition.dart';
 import 'package:daily_quran/domain/entities/surah.dart';
@@ -89,6 +90,18 @@ void main() {
             'revelationPlace': 'meccan',
           },
         ],
+      });
+
+  String wordIndex() => jsonEncode(<String, Object?>{
+        'schemaVersion': 1,
+        'languageName': 'English',
+        'source': <String, Object?>{'name': 'Example word source'},
+        'words': <String, Object?>{
+          '1:1': <Object?>[
+            <String, Object?>{'arabic': 'بِسْمِ', 'translation': 'In (the) name'},
+            <String, Object?>{'arabic': 'ٱللَّهِ', 'translation': '(of) Allah'},
+          ],
+        },
       });
 
   AssetQuranContentSource sourceWith(Map<String, String> assets) =>
@@ -250,6 +263,88 @@ void main() {
     final List<Surah> surahs = await source.loadSurahs('saheeh_international');
     expect(surahs, hasLength(1));
     expect(surahs.single.nameEnglish, 'Layout checks');
+  });
+
+  test('the shared word index is attached to every ayah that has one',
+      () async {
+    final AssetQuranContentSource source = sourceWith(<String, String>{
+      ContentSchema.catalogAsset: catalog(<Map<String, Object?>>[saheeh]),
+      ContentSchema.assetForSlug('saheeh_international'): editionFile(),
+      ContentSchema.wordByWordAsset: wordIndex(),
+    });
+
+    final List<Ayah> ayat = await source.loadAyat('saheeh_international');
+    expect(ayat.first.hasWords, isTrue);
+    expect(ayat.first.words, hasLength(2));
+    expect(ayat.first.words.first.arabic, 'بِسْمِ');
+    expect(ayat.first.words.first.translation, 'In (the) name');
+
+    // Ayat the index does not cover simply have none.
+    expect(ayat[1].hasWords, isFalse);
+    expect(ayat[2].hasWords, isFalse);
+  });
+
+  test('a missing word index costs the glosses and nothing else', () async {
+    final AssetQuranContentSource source = sourceWith(<String, String>{
+      ContentSchema.catalogAsset: catalog(<Map<String, Object?>>[saheeh]),
+      ContentSchema.assetForSlug('saheeh_international'): editionFile(),
+    });
+
+    final List<Ayah> ayat = await source.loadAyat('saheeh_international');
+    expect(ayat, hasLength(3));
+    expect(ayat.first.hasWords, isFalse);
+    expect(ayat.first.arabicText, 'النص العربي الأول');
+  });
+
+  test('an edition that carries its own words keeps them', () async {
+    final String own = jsonEncode(<String, Object?>{
+      'schemaVersion': 1,
+      'editionId': 'saheeh_international',
+      'ayat': <Object?>[
+        <String, Object?>{
+          'surah': 1,
+          'ayah': 1,
+          'arabic': 'النص',
+          'words': <Object?>[
+            <String, Object?>{'arabic': 'خاص', 'translation': 'its own'},
+          ],
+        },
+      ],
+    });
+    final AssetQuranContentSource source = sourceWith(<String, String>{
+      ContentSchema.catalogAsset: catalog(<Map<String, Object?>>[saheeh]),
+      ContentSchema.assetForSlug('saheeh_international'): own,
+      ContentSchema.wordByWordAsset: wordIndex(),
+    });
+
+    final List<Ayah> ayat = await source.loadAyat('saheeh_international');
+    expect(ayat.single.words, hasLength(1));
+    expect(ayat.single.words.single.translation, 'its own');
+  });
+
+  test('a malformed word entry is dropped, not fatal', () async {
+    final String broken = jsonEncode(<String, Object?>{
+      'schemaVersion': 1,
+      'words': <String, Object?>{
+        '1:1': <Object?>[
+          'not an object',
+          <String, Object?>{'arabic': '   ', 'translation': '   '},
+          <String, Object?>{'arabic': 'صحيح', 'translation': 'sound'},
+        ],
+      },
+    });
+    final AssetQuranContentSource source = sourceWith(<String, String>{
+      ContentSchema.catalogAsset: catalog(<Map<String, Object?>>[saheeh]),
+      ContentSchema.assetForSlug('saheeh_international'): editionFile(),
+      ContentSchema.wordByWordAsset: broken,
+    });
+
+    final List<Ayah> ayat = await source.loadAyat('saheeh_international');
+    expect(ayat.first.words, hasLength(1));
+    expect(ayat.first.words.single, const AyahWord(
+      arabic: 'صحيح',
+      translation: 'sound',
+    ));
   });
 
   test('reports content as unavailable rather than throwing', () async {

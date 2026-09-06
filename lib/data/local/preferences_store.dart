@@ -17,6 +17,7 @@ class PreferencesStore implements PreferencesRepository {
 
   static const String _kLanguageMode = 'pref.language_mode';
   static const String _kTransliteration = 'pref.show_transliteration';
+  static const String _kWordByWord = 'pref.show_word_by_word';
   static const String _kThemeMode = 'pref.theme_mode';
   static const String _kTextSize = 'pref.text_size';
   static const String _kReadingOrder = 'pref.reading_order';
@@ -35,6 +36,7 @@ class PreferencesStore implements PreferencesRepository {
     return UserPreferences(
       languageMode: LanguageMode.fromStorage(_prefs.getString(_kLanguageMode)),
       showTransliteration: _prefs.getBool(_kTransliteration) ?? false,
+      showWordByWord: _prefs.getBool(_kWordByWord) ?? false,
       themeMode: AppThemeMode.fromStorage(_prefs.getString(_kThemeMode)),
       textSize: TextSizePreference.fromStorage(_prefs.getString(_kTextSize)),
       readingOrder: ReadingOrder.fromStorage(_prefs.getString(_kReadingOrder)),
@@ -47,6 +49,7 @@ class PreferencesStore implements PreferencesRepository {
   Future<void> saveUserPreferences(UserPreferences preferences) async {
     await _prefs.setString(_kLanguageMode, preferences.languageMode.storageKey);
     await _prefs.setBool(_kTransliteration, preferences.showTransliteration);
+    await _prefs.setBool(_kWordByWord, preferences.showWordByWord);
     await _prefs.setString(_kThemeMode, preferences.themeMode.storageKey);
     await _prefs.setString(_kTextSize, preferences.textSize.storageKey);
     await _prefs.setString(_kReadingOrder, preferences.readingOrder.storageKey);

@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/ayah_word.dart';
 import '../../domain/entities/enums.dart';
 import '../../domain/entities/surah.dart';
 import 'app_database.dart';
@@ -206,7 +209,37 @@ class AyahDao {
         'sajda': ayah.sajda ? 1 : 0,
         'reference': ayah.reference,
         'source': ayah.source,
+        'words': _encodeWords(ayah.words),
       };
+
+  /// Words are stored as a JSON array on the ayah row rather than in a table
+  /// of their own: they are a value of the ayah, always read with it and never
+  /// queried independently, and a separate table would add 77,000 rows and a
+  /// join for nothing.
+  static String? _encodeWords(List<AyahWord> words) {
+    if (words.isEmpty) return null;
+    return jsonEncode(<Map<String, Object?>>[
+      for (final AyahWord word in words) word.toJson(),
+    ]);
+  }
+
+  /// Null for an ayah stored before word glosses existed, and for one whose
+  /// edition has none. Malformed JSON reads back as no words rather than
+  /// failing the read — a gloss is never worth losing the ayah over.
+  static List<AyahWord> _decodeWords(Object? value) {
+    if (value is! String || value.isEmpty) return const <AyahWord>[];
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(value);
+    } on FormatException {
+      return const <AyahWord>[];
+    }
+    if (decoded is! List) return const <AyahWord>[];
+    return <AyahWord>[
+      for (final Object? entry in decoded)
+        if (entry is Map<String, Object?>) AyahWord.fromJson(entry),
+    ];
+  }
 
   static Ayah _fromRow(Map<String, Object?> row) => Ayah(
         id: row['id']! as String,
@@ -224,5 +257,6 @@ class AyahDao {
         sajda: (row['sajda'] as int?) == 1,
         reference: row['reference'] as String?,
         source: row['source'] as String?,
+        words: _decodeWords(row['words']),
       );
 }

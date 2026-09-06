@@ -1,4 +1,5 @@
 import 'package:daily_quran/domain/entities/ayah.dart';
+import 'package:daily_quran/domain/entities/ayah_word.dart';
 import 'package:daily_quran/domain/entities/enums.dart';
 import 'package:daily_quran/shared/theme/app_theme.dart';
 import 'package:daily_quran/shared/widgets/ayah_view.dart';
@@ -27,6 +28,7 @@ void main() {
     LanguageMode mode, {
     double scale = 1.0,
     bool showTransliteration = false,
+    bool showWordByWord = false,
     bool translationIsRightToLeft = false,
   }) {
     return tester.pumpWidget(
@@ -39,6 +41,7 @@ void main() {
               languageMode: mode,
               textScale: scale,
               showTransliteration: showTransliteration,
+              showWordByWord: showWordByWord,
               translationIsRightToLeft: translationIsRightToLeft,
             ),
           ),
@@ -226,6 +229,76 @@ void main() {
 
     expect(largeArabic, closeTo(baseArabic * 1.3, 0.01));
     expect(largeTranslation, closeTo(baseTranslation * 1.3, 0.01));
+  });
+
+  group('word by word', () {
+    const Ayah glossed = Ayah(
+      id: 'e:1:1',
+      editionId: 'e',
+      ordinal: 1,
+      surahNumber: 1,
+      ayahNumber: 1,
+      arabicText: 'النص العربي',
+      translationText: 'The translated line.',
+      words: <AyahWord>[
+        AyahWord(arabic: 'ٱلْحَمْدُ', translation: 'All praise'),
+        AyahWord(arabic: 'لِلَّهِ', translation: '(is) for Allah'),
+      ],
+    );
+
+    testWidgets('is off unless asked for', (WidgetTester tester) async {
+      await pumpView(tester, glossed, LanguageMode.both);
+
+      expect(find.text('All praise'), findsNothing);
+      expect(find.text('النص العربي'), findsOneWidget);
+    });
+
+    testWidgets('replaces the running Arabic rather than repeating it',
+        (WidgetTester tester) async {
+      // Showing the same text twice, once whole and once in pieces, reads as a
+      // mistake.
+      await pumpView(tester, glossed, LanguageMode.both,
+          showWordByWord: true);
+
+      expect(find.text('ٱلْحَمْدُ'), findsOneWidget);
+      expect(find.text('All praise'), findsOneWidget);
+      expect(find.text('لِلَّهِ'), findsOneWidget);
+      expect(find.text('(is) for Allah'), findsOneWidget);
+      expect(find.text('النص العربي'), findsNothing);
+
+      // The ayah's own translation is still there: a gloss is not a
+      // substitute for it.
+      expect(find.text('The translated line.'), findsOneWidget);
+    });
+
+    testWidgets('the words flow right-to-left', (WidgetTester tester) async {
+      await pumpView(tester, glossed, LanguageMode.arabic,
+          showWordByWord: true);
+
+      final Directionality directionality = tester.widget<Directionality>(
+        find
+            .ancestor(
+              of: find.text('ٱلْحَمْدُ'),
+              matching: find.byType(Directionality),
+            )
+            .first,
+      );
+      expect(directionality.textDirection, TextDirection.rtl);
+
+      // The first word sits to the right of the second.
+      final double first = tester.getCenter(find.text('ٱلْحَمْدُ')).dx;
+      final double second = tester.getCenter(find.text('لِلَّهِ')).dx;
+      expect(first, greaterThan(second));
+    });
+
+    testWidgets('an ayah with no glosses keeps its running Arabic',
+        (WidgetTester tester) async {
+      // Asking for something the installed edition does not have must never
+      // blank the Arabic out.
+      await pumpView(tester, full, LanguageMode.both, showWordByWord: true);
+
+      expect(find.text('النص العربي'), findsOneWidget);
+    });
   });
 
   testWidgets('never offers to speak the Arabic aloud',

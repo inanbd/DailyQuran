@@ -1,5 +1,7 @@
 import 'package:meta/meta.dart';
 
+import 'ayah_word.dart';
+
 /// A single ayah as stored and displayed.
 ///
 /// Text fields are reproduced verbatim from the configured content source and
@@ -22,6 +24,7 @@ class Ayah {
     this.sajda = false,
     this.reference,
     this.source,
+    this.words = const <AyahWord>[],
   });
 
   /// Globally unique id within an edition, e.g. `saheeh_international:2:255`.
@@ -67,12 +70,47 @@ class Ayah {
   /// Per-ayah attribution, when it differs from the edition's.
   final String? source;
 
+  /// The ayah's words with their glosses, in reading order.
+  ///
+  /// Empty unless a word index has been installed. Word glosses are the same
+  /// whichever translation is being read, so they come from one shared file
+  /// rather than from the edition — see `ContentSchema.wordByWordAsset`.
+  final List<AyahWord> words;
+
   /// The edition-independent identity of this ayah, e.g. `2:255`.
   ///
   /// Reading progress and favourites are keyed by this rather than by [id]:
   /// ayah 2:255 is the same ayah whichever translation renders it, so a reader
   /// who switches translation keeps their place and their saved ayat.
   String get verseKey => '$surahNumber:$ayahNumber';
+
+  bool get hasWords => words.isNotEmpty;
+
+  /// This ayah with its word glosses attached.
+  ///
+  /// Words are parsed from a shared index rather than from the edition file,
+  /// so they are joined on after the ayah itself has been read.
+  Ayah withWords(List<AyahWord> words) {
+    if (words.isEmpty) return this;
+    return Ayah(
+      id: id,
+      editionId: editionId,
+      ordinal: ordinal,
+      surahNumber: surahNumber,
+      ayahNumber: ayahNumber,
+      surahNameArabic: surahNameArabic,
+      surahNameEnglish: surahNameEnglish,
+      arabicText: arabicText,
+      translationText: translationText,
+      transliteration: transliteration,
+      juz: juz,
+      page: page,
+      sajda: sajda,
+      reference: reference,
+      source: source,
+      words: words,
+    );
+  }
 
   bool get hasArabic => (arabicText ?? '').trim().isNotEmpty;
   bool get hasTranslation => (translationText ?? '').trim().isNotEmpty;

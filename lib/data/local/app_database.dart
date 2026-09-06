@@ -11,7 +11,7 @@ class AppDatabase {
   AppDatabase({this.factoryOverride, this.pathOverride});
 
   static const String fileName = 'daily_quran.db';
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
 
   static const String editionsTable = 'editions';
   static const String ayahTable = 'ayah';
@@ -56,6 +56,14 @@ class AppDatabase {
           // Migrations are additive. Ayah and surah tables may be dropped and
           // re-imported; the reader's own data — progress and favourites —
           // must survive every upgrade.
+          if (oldVersion < 2) {
+            // Word glosses arrived after the first release. Adding the column
+            // leaves it null on every existing row, which reads back as an
+            // ayah with no words until the edition is reinstalled.
+            await db.execute(
+              'ALTER TABLE $ayahTable ADD COLUMN words TEXT',
+            );
+          }
         },
       ),
     );
@@ -92,7 +100,11 @@ class AppDatabase {
         page INTEGER,
         sajda INTEGER NOT NULL DEFAULT 0,
         reference TEXT,
-        source TEXT
+        source TEXT,
+        -- The ayah's words and their glosses, as a JSON array. They are a
+        -- value of the ayah: always read with it, never queried on their
+        -- own, so a column beats a second table and an extra join.
+        words TEXT
       )
     ''');
     batch.execute(

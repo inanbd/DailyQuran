@@ -19,14 +19,23 @@ in a source stay gaps.
 | Edition | Status |
 |---|---|
 | `dev_sample` — "Development Sample" | **Development fixture. Not the Qur'an.** Placeholder prose written for this repository to exercise layout, typography and RTL rendering. |
-| `saheeh_international` | Uthmani Arabic + Saheeh International English + English transliteration, imported from `quran-json` under CC BY-SA 4.0. |
-| `arabic_uthmani`, `maududi`, `hamidullah`, `garcia`, `kuliev`, `muhiuddin_khan` | Bibliographic metadata only. No text. Each shows a "Dataset not installed" state until imported — one command each, see below. |
+| `arabic_uthmani` | The Uthmani Arabic text alone, no translation. |
+| `saheeh_international` | Uthmani Arabic + Saheeh International (English). |
+| `maududi` | Uthmani Arabic + Abul A'la Maududi (Urdu, right-to-left). |
+| `hamidullah` | Uthmani Arabic + Muhammad Hamidullah (French). |
+| `garcia` | Uthmani Arabic + Muhammad Isa García (Spanish). |
+| `kuliev` | Uthmani Arabic + Elmir Kuliev (Russian). |
+| `muhiuddin_khan` | Uthmani Arabic + Muhiuddin Khan (Bengali). |
+
+All seven carry an English transliteration and were imported from `quran-json`
+under CC BY-SA 4.0.
 
 Also bundled, and **not** Qur'an text:
 
 | File | What it is |
 |---|---|
 | `assets/data/surahs.json` | The surah index: names, ayah counts and Meccan/Medinan classification for all 114 surahs, in the standard Kufan numbering. Reference data. Its counts sum to 6,236, which the test suite asserts. |
+| `assets/data/word_by_word.json` | The word index: every ayah's words with the gloss the source gives each one. 6,236 ayat, 77,429 words. A word-level reading aid, **not** a translation of the ayah — see below. |
 
 The fixture is marked `"verification": "development_fixture"` in the catalog.
 The app surfaces that on the Today screen, on the edition screen, on the library
@@ -60,7 +69,7 @@ Translators generally need to be credited by name. Record them with
 
 ## The data contract
 
-Three files, all plain JSON. This is the whole contract — anything that can emit
+Four files, all plain JSON. This is the whole contract — anything that can emit
 these shapes can back the app.
 
 ### `assets/data/catalog.json`
@@ -131,6 +140,41 @@ entries without one are listed but not startable.
   ]
 }
 ```
+
+### `assets/data/word_by_word.json`
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "notice": "… not a translation of the ayah …",
+  "languageName": "English",
+  "languageCode": "en",
+  "source": { "name": "…", "url": "…", "licence": "…" },
+  "totalAyah": 6236,
+  "words": {
+    "2:255": [
+      {
+        "arabic": "ٱللَّهُ",
+        "translation": "Allah",
+        "transliteration": "al-lahu"
+      }
+    ]
+  }
+}
+```
+
+Keyed by verse key, so it is joined onto whichever edition is being installed.
+Glosses are the same whichever translation is read, which is why they live here
+once rather than in every edition file — duplicating them across seven editions
+would cost around 70 MB for no benefit.
+
+A word with neither `arabic` nor `translation` is dropped. An edition file may
+carry its own `words` per ayah, and those win over the shared index.
+
+**A gloss is not a translation.** It says what one word means on its own; the
+ayah's translation says what the ayah means. The app renders them differently
+and shows the ayah's translation either way, and the file has to carry a
+`notice` saying so — the test suite checks for it.
 
 ### `assets/data/surahs.json`
 
@@ -251,6 +295,36 @@ Three flags earn their keep on this dataset:
 
 The dataset marks no prostrations and carries no juz' or page numbers, so the
 app shows none for these imports — which is correct; it never infers them.
+
+## Recipe: word-by-word glosses from the Quran.com API
+
+```bash
+./tool/fetch_word_by_word.sh english   # or urdu, bangla, indonesian, …
+```
+
+That downloads the raw pages into `.dart_tool/quran-wbw` (git-ignored, cached
+between runs) and then runs `tool/import_word_by_word.dart` to assemble
+`assets/data/word_by_word.json`. HTTP and conversion are deliberately separate,
+so the conversion is testable and does not depend on the network.
+
+The API returns the ayah-number ornament at the end of each verse as if it were
+a word; the importer drops those, and reports how many it dropped. Everything
+else is copied verbatim.
+
+**Read this before shipping it.** The glosses come from the Quranic Universal
+Library by way of Quran.com, and derive from the
+[Quranic Arabic Corpus](https://corpus.quran.com/). Unlike `quran-json`, this
+source does not hand you an explicit redistribution licence with the data.
+Check Quran.com's terms and the corpus's licence, and satisfy yourself that you
+may distribute the glosses inside a published app, before releasing a build
+that contains them. Removing them is one command:
+
+```bash
+rm assets/data/word_by_word.json
+```
+
+The app then simply has no word-by-word view; nothing else changes, and a test
+covers that path.
 
 ## Adding an edition the catalog does not know about
 

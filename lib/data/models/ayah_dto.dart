@@ -1,4 +1,5 @@
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/ayah_word.dart';
 import '../../domain/entities/enums.dart';
 import '../../domain/entities/surah.dart';
 
@@ -32,6 +33,7 @@ abstract final class AyahDto {
       sajda: _bool(json['sajda']),
       reference: _string(json['reference']),
       source: _string(json['source']) ?? fallbackSource,
+      words: wordsFromJson(json['words']),
     );
   }
 
@@ -49,6 +51,20 @@ abstract final class AyahDto {
       revelationPlace:
           RevelationPlace.fromStorage(json['revelationPlace'] as String?),
     );
+  }
+
+  /// Parses a `words` array. Anything that is not a list of objects, or that
+  /// yields no usable word, becomes an empty list rather than an error: a
+  /// missing gloss costs the word-by-word view, never the reading.
+  static List<AyahWord> wordsFromJson(Object? raw) {
+    if (raw is! List) return const <AyahWord>[];
+    final List<AyahWord> words = <AyahWord>[];
+    for (final Object? entry in raw) {
+      if (entry is! Map<String, Object?>) continue;
+      final AyahWord word = AyahWord.fromJson(entry);
+      if (word.hasArabic || word.hasTranslation) words.add(word);
+    }
+    return words;
   }
 
   static String? _string(Object? value) {

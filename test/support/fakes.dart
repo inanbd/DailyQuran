@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:daily_quran/domain/entities/ayah.dart';
+import 'package:daily_quran/domain/entities/ayah_word.dart';
 import 'package:daily_quran/domain/entities/enums.dart';
 import 'package:daily_quran/domain/entities/notification_preferences.dart';
 import 'package:daily_quran/domain/entities/quran_edition.dart';
@@ -29,6 +30,7 @@ class FakeContentSource implements QuranContentSource {
     String progressScope = 'quran',
     String languageCode = 'en-US',
     bool isRightToLeft = false,
+    bool withWords = false,
     ContentVerification verification = ContentVerification.verified,
     String Function(int ordinal)? translationText,
   }) {
@@ -69,6 +71,20 @@ class FakeContentSource implements QuranContentSource {
           transliteration: 'Nass raqm $ordinal',
           juz: 30,
           reference: 'Surah $surah $surah:$ayah',
+          words: withWords
+              ? <AyahWord>[
+                  AyahWord(
+                    arabic: 'كلمة',
+                    translation: 'word',
+                    transliteration: 'kalima',
+                  ),
+                  AyahWord(
+                    arabic: 'رقم',
+                    translation: 'number $ordinal',
+                    transliteration: 'raqm',
+                  ),
+                ]
+              : const <AyahWord>[],
         ),
       );
     }

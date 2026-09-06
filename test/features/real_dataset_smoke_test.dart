@@ -58,6 +58,13 @@ void main() {
       expect(ayat[index].hasArabic, isTrue, reason: 'ayah ${index + 1}');
     }
 
+    // Glosses come from the shared index and are joined on at load.
+    expect(first.hasWords, isTrue);
+    expect(first.words.first.arabic, isNotNull);
+    expect(first.words.first.translation, isNotNull);
+    expect(kursi.hasWords, isTrue);
+    expect(last.hasWords, isTrue);
+
     // A complete edition inherits the bundled surah index rather than
     // duplicating it.
     final List<Surah> surahs = await source.loadSurahs(editionId);

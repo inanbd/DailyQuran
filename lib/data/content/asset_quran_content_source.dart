@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/errors/app_exception.dart';
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/ayah_word.dart';
 import '../../domain/entities/quran_edition.dart';
 import '../../domain/entities/surah.dart';
 import '../../domain/repositories/quran_content_source.dart';
@@ -33,6 +34,7 @@ class AssetQuranContentSource implements QuranContentSource {
   /// the app would be pure waste.
   List<QuranEdition>? _catalogCache;
   List<Map<String, Object?>>? _surahIndexCache;
+  Map<String, List<AyahWord>>? _wordIndexCache;
 
   @override
   Future<List<QuranEdition>> loadCatalog() async {
@@ -84,19 +86,28 @@ class AssetQuranContentSource implements QuranContentSource {
       );
     }
 
+    // Glosses are the same whichever translation is being read, so they come
+    // from one shared index and are joined on here. An edition that carries its
+    // own `words` keeps them: the parsed ayah already has them, and
+    // `withWords` is only reached when it does not.
+    final Map<String, List<AyahWord>> wordIndex = await _loadWordIndex();
+
     final String fallbackSource = edition.source.name;
     final List<Ayah> ayat = <Ayah>[];
     int ordinal = 0;
     for (final Object? entry in entries) {
       if (entry is! Map<String, Object?>) continue;
       ordinal++;
+      final Ayah ayah = AyahDto.fromJson(
+        entry,
+        editionId: editionId,
+        ordinal: ordinal,
+        fallbackSource: fallbackSource,
+      );
       ayat.add(
-        AyahDto.fromJson(
-          entry,
-          editionId: editionId,
-          ordinal: ordinal,
-          fallbackSource: fallbackSource,
-        ),
+        ayah.hasWords
+            ? ayah
+            : ayah.withWords(wordIndex[ayah.verseKey] ?? const <AyahWord>[]),
       );
     }
 
@@ -134,6 +145,32 @@ class AssetQuranContentSource implements QuranContentSource {
         .map((Map<String, Object?> json) =>
             AyahDto.surahFromJson(json, editionId: editionId))
         .toList(growable: false);
+  }
+
+  /// The shared word index, keyed by verse key.
+  ///
+  /// A missing or unreadable index costs the word-by-word view and nothing
+  /// else, so it resolves to an empty map rather than failing the install.
+  Future<Map<String, List<AyahWord>>> _loadWordIndex() async {
+    final Map<String, List<AyahWord>>? cached = _wordIndexCache;
+    if (cached != null) return cached;
+
+    final Map<String, List<AyahWord>> parsed = <String, List<AyahWord>>{};
+    try {
+      final Map<String, Object?> json =
+          await _readJson(ContentSchema.wordByWordAsset);
+      final Object? words = json['words'];
+      if (words is Map<String, Object?>) {
+        for (final MapEntry<String, Object?> entry in words.entries) {
+          final List<AyahWord> value = AyahDto.wordsFromJson(entry.value);
+          if (value.isNotEmpty) parsed[entry.key] = value;
+        }
+      }
+    } on AppException {
+      // No word index installed. The reading is unaffected.
+    }
+    _wordIndexCache = parsed;
+    return parsed;
   }
 
   Future<List<Map<String, Object?>>> _loadSurahIndex() async {
@@ -191,5 +228,6 @@ class AssetQuranContentSource implements QuranContentSource {
   void clearCache() {
     _catalogCache = null;
     _surahIndexCache = null;
+    _wordIndexCache = null;
   }
 }

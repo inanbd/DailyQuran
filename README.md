@@ -2,10 +2,11 @@
 
 A quiet reading app: one ayah at a time, one gentle reminder, steady progress.
 
-You choose a translation, choose when you want to be reminded, and read the
-Qur'an through in order. Your place is saved and follows you from one
-translation to another, nothing is marked read unless you read it, and the whole
-reading experience works offline. No account, no feed, no streaks.
+You choose a translation — seven ship with the app, in six languages — choose
+when you want to be reminded, and read the Qur'an through in order. Your place
+is saved and follows you from one translation to another, nothing is marked read
+unless you read it, and the whole reading experience works offline. No account,
+no feed, no streaks.
 
 ---
 
@@ -13,6 +14,8 @@ reading experience works offline. No account, no feed, no streaks.
 
 - [Reading model](#reading-model)
 - [Qur'an text and source integrity](#quran-text-and-source-integrity)
+- [Choosing a translation](#choosing-a-translation)
+- [Word-by-word tarjama](#word-by-word-tarjama)
 - [Recitation](#recitation)
 - [Getting started](#getting-started)
 - [Importing an edition](#importing-an-edition)
@@ -44,6 +47,7 @@ That single rule produces the behaviour the product needs:
 | Missed a fortnight | The first ayah you never read, not the 14th |
 | Skipped ahead to 2:255 and read it | Tomorrow returns to the ayah you skipped |
 | Changed translation | Exactly where you were, in the new translation |
+| Turned word-by-word on | The same ayah, its Arabic shown word by word |
 | Finished the Qur'an | A completion state; no wrapping around |
 
 A reminder **firing** never changes progress. Progress changes only when the
@@ -92,20 +96,25 @@ text or any translation of it.** Text is copied verbatim from a dataset you
 choose and can vouch for, and it always travels with an attribution record —
 shown on the edition screen and gathered under **Settings → Qur'an sources**.
 
-Two things ship with the app:
+What ships with the app:
 
+- **Seven editions**, all imported from
+  [`quran-json`](https://github.com/risan/quran-json) under CC BY-SA 4.0: the
+  Uthmani Arabic text on its own, and with the Saheeh International (English),
+  Maududi (Urdu), Hamidullah (French), García (Spanish), Kuliev (Russian) and
+  Muhiuddin Khan (Bengali) translations. Each carries an English
+  transliteration. See [Licences](#licences).
+- **A word-by-word index** — every ayah's words with the gloss the source gives
+  each one. See [Word-by-word tarjama](#word-by-word-tarjama).
 - **`dev_sample` ("Development Sample")** — placeholder prose written for this
   repository to exercise layout, typography and right-to-left rendering. Every
   field of it is developer text; it is labelled a development fixture in the
   catalog, tagged as such on every screen that shows it, and hidden from the
-  library as soon as any verified edition is readable.
-- **`saheeh_international`** — the Uthmani Arabic text with the Saheeh
-  International English translation and an English transliteration, imported
-  from [`quran-json`](https://github.com/risan/quran-json) under CC BY-SA 4.0.
-  See [Licences](#licences).
+  library as soon as any verified edition is readable — which, now that real
+  editions ship, is always.
 
-Everything else in the catalog is bibliographic metadata only, and shows a
-**Dataset not installed** state until you import it.
+A catalog entry whose dataset has not been imported shows a **Dataset not
+installed** state rather than failing.
 
 The bundled surah index (`assets/data/surahs.json`) is reference data — names,
 lengths and Meccan/Medinan classification for all 114 surahs — and contains no
@@ -114,6 +123,42 @@ imported, and its ayah counts sum to 6,236, which the test suite asserts.
 
 See [DATA_SOURCES.md](DATA_SOURCES.md) for the data contract and what to check
 before importing an edition.
+
+## Choosing a translation
+
+The translation being read is named at the top of the reading screen, and
+tapping it opens the list. Choosing another switches immediately and leaves the
+reader on the same ayah: because progress and favourites are stored against the
+ayah rather than the translator, nothing is lost and nothing has to be
+re-synced. The library tab is still there for reading *about* an edition —
+its translator, its source, its licence — before committing to it.
+
+Only editions that can actually be opened are listed. The development fixture
+is excluded, so placeholder text can never be one tap from the Qur'an.
+
+## Word-by-word tarjama
+
+Each Arabic word shown with what it means on its own, in place of the running
+Arabic, laid out right-to-left so the reading order is the Arabic's.
+
+It is a **reading aid, not a second translation**. A gloss says what one word
+means in isolation; the ayah's translation says what the ayah means. The app
+keeps them visually distinct and shows the ayah's own translation underneath
+either way, and the bundled index says so in its own `notice` field — which the
+test suite asserts.
+
+Turn it on under **Settings → Reading → Show word by word**. It is off by
+default, and the control does nothing on an edition with no glosses installed
+rather than blanking the Arabic out.
+
+The glosses live in one shared file, `assets/data/word_by_word.json`, and are
+attached to every edition as it installs — they do not change with the
+translation being read, so duplicating them into each edition would cost about
+70 MB for nothing. Bring them in, or replace them with another language, with:
+
+```bash
+./tool/fetch_word_by_word.sh english   # or urdu, bangla, indonesian, …
+```
 
 ## Recitation
 
@@ -147,8 +192,11 @@ The quickest route is the open [`quran-json`](https://github.com/risan/quran-jso
 dataset (CC BY-SA 4.0): the Uthmani text from The Noble Qur'an Encyclopedia with
 translations and an English transliteration from Tanzil.net.
 
+All seven are already imported. To re-import them, or to pick up a change in
+the dataset:
+
 ```bash
-./tool/fetch_quran_json.sh hamidullah   # or: all
+./tool/fetch_quran_json.sh all          # or one id
 flutter run
 ```
 
@@ -213,15 +261,17 @@ lib/
     services/     Reminder maths and the reading rule (pure Dart)
   features/
     onboarding/ library/ progress/ settings/ shell/ splash/
-    today/      Reading surface, surah index, auto-marking, swipe
+    today/      Reading surface, surah index, translation chooser,
+                auto-marking, swipe
   shared/
     theme/      Colours, typography, spacing, ThemeData
     widgets/    Reusable components
 assets/
-  data/         Edition catalog, surah index, per-edition JSON
+  data/         Edition catalog, surah index, word index, per-edition JSON
   fonts/        Inter and Noto Naskh Arabic (OFL)
 tool/
   import_quran.dart, fetch_quran_json.sh
+  import_word_by_word.dart, fetch_word_by_word.sh
 ```
 
 ## Architecture
@@ -244,6 +294,12 @@ Some deliberate choices:
   offline and keeps 6,236 ayat cheap to page through.
 - **Progress is keyed by verse key within a scope**, which is what lets a change
   of translation carry the reader's place and their favourites with it.
+- **What does not vary by translation lives once.** The surah index and the
+  word-by-word glosses are the same for every edition, so they are shared files
+  joined on at install time rather than copied into each one.
+- **Words are stored as a column on the ayah, not a table of their own.** They
+  are a value of the ayah — always read with it, never queried independently —
+  and a second table would mean 77,000 more rows and a join for nothing.
 - **Scheduling maths is pure Dart.**
   [`ReminderSchedule`](lib/domain/services/reminder_schedule.dart) and
   [`ReadingScheduler`](lib/domain/services/reading_scheduler.dart) have no
@@ -311,13 +367,16 @@ flutter analyze     # lib, test and tool must be clean
 flutter test
 ```
 
-136 tests cover the reminder cadences and period boundaries, the reading rule
+161 tests cover the reminder cadences and period boundaries, the reading rule
 (including missed days and skipping ahead), the SQLite progress layer and its
-shared scope, JSON parsing and error states, the repository install path, the
-reading surface in each language mode, transliteration and right-to-left
-translations, reading the translation aloud (and never the Arabic), auto-marking
-and its guard rails, swipe navigation, the surah index, notification scheduling
-and permission handling, and the full first-run journey end to end.
+shared scope, the v1 → v2 migration, JSON parsing and error states, the
+repository install path, the reading surface in each language mode,
+transliteration and right-to-left translations, word-by-word glosses and the
+guarantee that they replace the running Arabic rather than repeat it, switching
+translation without losing your place, reading the translation aloud (and never
+the Arabic), auto-marking and its guard rails, swipe navigation, the surah
+index, notification scheduling and permission handling, and the full first-run
+journey end to end.
 
 `test/features/main_journey_test.dart` runs the exact scenario the product is
 built around: install → Saheeh International → Arabic + translation → daily at
@@ -361,6 +420,8 @@ app is in the foreground and lets taps reach Dart.
   so the reader's system voice setting decides how Arabic is spoken.
 - A translation that reads right-to-left declares itself in the catalog and is
   laid out and aligned accordingly.
+- In the word-by-word view each word is announced as one label — the Arabic and
+  its gloss together — rather than as two disconnected fragments.
 - Progress bars announce a single sentence rather than three fragments; edition
   cards announce translation, translator, language, size and progress as one
   label.
@@ -384,13 +445,20 @@ fit. Bundled third-party assets carry their own terms:
 - **Inter** — SIL Open Font License 1.1 (`assets/fonts/OFL-Inter.txt`)
 - **Noto Naskh Arabic** — SIL Open Font License 1.1
   (`assets/fonts/OFL-NotoNaskhArabic.txt`)
-- **`assets/data/editions/saheeh_international.json`** — adapted from
-  [`quran-json`](https://github.com/risan/quran-json) and therefore distributed
-  under **CC BY-SA 4.0**. Attribution travels with the file, in its own `source`
-  block and in `assets/data/catalog.json`, and the app shows it under
-  **Settings → Qur'an sources**. If you adapt that file further, your version
-  carries the same licence. This applies to the data file, not to the
-  application code alongside it.
+- **Everything under `assets/data/editions/`** except the development fixture —
+  adapted from [`quran-json`](https://github.com/risan/quran-json) and therefore
+  distributed under **CC BY-SA 4.0**. Attribution travels with each file, in its
+  own `source` block and in `assets/data/catalog.json`, and the app shows it
+  under **Settings → Qur'an sources**. If you adapt those files further, your
+  versions carry the same licence. This applies to the data files, not to the
+  application code alongside them.
+- **`assets/data/word_by_word.json`** — built from the
+  [Quran.com API](https://api.quran.com/api/v4) (Quranic Universal Library),
+  whose word-by-word glosses derive from the Quranic Arabic Corpus. **Check
+  Quran.com's terms and the corpus's licence before publishing a build that
+  contains it**; unlike the editions above, this one does not come with an
+  explicit redistribution licence, and the choice to ship it is yours. See
+  [DATA_SOURCES.md](DATA_SOURCES.md).
 
 Any other edition you import carries its own licence and attribution; record
 them with the importer's `--licence` and `--source-name` flags so they are shown

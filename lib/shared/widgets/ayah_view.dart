@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/ayah_word.dart';
 import '../../domain/entities/enums.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -26,6 +27,7 @@ class AyahView extends StatelessWidget {
     required this.languageMode,
     required this.textScale,
     this.showTransliteration = false,
+    this.showWordByWord = false,
     this.translationIsRightToLeft = false,
     this.showReference = true,
     this.onSpeakTranslation,
@@ -44,6 +46,9 @@ class AyahView extends StatelessWidget {
 
   /// Whether to show the transliteration, when the edition carries one.
   final bool showTransliteration;
+
+  /// Whether to show each Arabic word with its gloss, when the ayah has them.
+  final bool showWordByWord;
 
   /// Whether the translation is written right-to-left, e.g. Urdu.
   final bool translationIsRightToLeft;
@@ -76,6 +81,8 @@ class AyahView extends StatelessWidget {
     final bool showTranslation =
         wantsTranslation || (!wantsArabic && ayah.hasTranslation);
     final bool showLatin = showTransliteration && ayah.hasTransliteration;
+    // Only where the installed edition actually carries glosses.
+    final bool showWords = showWordByWord && ayah.hasWords;
 
     // Speaking is only ever offered for text that is actually on screen.
     final VoidCallback? speak = showTranslation ? onSpeakTranslation : null;
@@ -84,7 +91,13 @@ class AyahView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        if (showArabic) _ArabicText(text: ayah.arabicText!, scale: textScale),
+        // The word grid replaces the running Arabic rather than sitting beside
+        // it: showing the same text twice, once whole and once in pieces,
+        // reads as a mistake.
+        if (showArabic && showWords)
+          _WordByWordGrid(words: ayah.words, scale: textScale)
+        else if (showArabic)
+          _ArabicText(text: ayah.arabicText!, scale: textScale),
         if (showLatin) ...<Widget>[
           SizedBox(height: showArabic ? AppSpacing.md : 0),
           _TransliterationText(text: ayah.transliteration!, scale: textScale),
@@ -252,6 +265,100 @@ class AyahDivider extends StatelessWidget {
           ),
           Expanded(child: Divider(color: colors.border, height: 1)),
         ],
+      ),
+    );
+  }
+}
+
+/// The ayah's words, each with the gloss the source gives it.
+///
+/// Laid out right-to-left and wrapping like the Arabic it stands in for, so the
+/// reading order is the Arabic's rather than the app's.
+class _WordByWordGrid extends StatelessWidget {
+  const _WordByWordGrid({required this.words, required this.scale});
+
+  final List<AyahWord> words;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Wrap(
+        alignment: WrapAlignment.start,
+        spacing: AppSpacing.md,
+        runSpacing: AppSpacing.md,
+        children: <Widget>[
+          for (final AyahWord word in words)
+            _WordCell(word: word, scale: scale),
+        ],
+      ),
+    );
+  }
+}
+
+class _WordCell extends StatelessWidget {
+  const _WordCell({required this.word, required this.scale});
+
+  final AyahWord word;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = context.colors;
+    // The Arabic of a single word does not need the leading a whole line does,
+    // and the cells would be enormous with it.
+    final double arabicSize = AppTypography.arabicBody.fontSize! * scale * 0.78;
+
+    return Semantics(
+      // One label per word, so a screen reader reads "word, meaning" rather
+      // than two disconnected fragments.
+      label: <String>[
+        if (word.hasArabic) word.arabic!,
+        if (word.hasTranslation) word.translation!,
+      ].join(', '),
+      excludeSemantics: true,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 200),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: colors.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            if (word.hasArabic)
+              Text(
+                word.arabic!,
+                textAlign: TextAlign.center,
+                locale: const Locale('ar'),
+                style: AppTypography.arabicBody.copyWith(
+                  color: colors.textPrimary,
+                  fontSize: arabicSize,
+                  height: 1.6,
+                ),
+              ),
+            if (word.hasTranslation)
+              // The gloss reads left-to-right even though the words flow the
+              // other way.
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Text(
+                  word.translation!,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.progressMeta.copyWith(
+                    color: colors.textSecondary,
+                    fontSize: AppTypography.progressMeta.fontSize! * scale,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

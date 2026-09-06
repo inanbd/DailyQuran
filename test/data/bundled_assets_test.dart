@@ -186,6 +186,58 @@ void main() {
     expect(json['totalAyah'], 6236);
   });
 
+  test('the bundled word index is complete and labelled as glosses', () async {
+    final String raw =
+        await rootBundle.loadString(ContentSchema.wordByWordAsset);
+    final Map<String, Object?> json = jsonDecode(raw) as Map<String, Object?>;
+
+    // A gloss is a word-level aid, not a translation of the ayah. The file has
+    // to say so, because the app shows the two in the same place.
+    expect(json['notice'], contains('not a translation of the ayah'));
+
+    final Map<String, Object?> source = json['source']! as Map<String, Object?>;
+    expect(source['name'], isNotNull);
+    expect((source['name']! as String).trim(), isNotEmpty);
+    expect(json['languageName'], isNotNull);
+
+    final Map<String, Object?> words = json['words']! as Map<String, Object?>;
+    expect(words, hasLength(6236));
+
+    int total = 0;
+    for (final MapEntry<String, Object?> entry in words.entries) {
+      final List<Object?> value = entry.value! as List<Object?>;
+      expect(value, isNotEmpty, reason: entry.key);
+      for (final Object? word in value) {
+        final Map<String, Object?> map = word! as Map<String, Object?>;
+        // A word with neither side is noise; the importer drops those.
+        expect(
+          map['arabic'] != null || map['translation'] != null,
+          isTrue,
+          reason: entry.key,
+        );
+        total++;
+      }
+    }
+    expect(total, greaterThan(70000));
+  });
+
+  test('the word index reaches the installed editions', () async {
+    final List<QuranEdition> editions = await source.loadCatalog();
+    for (final QuranEdition edition in editions) {
+      if (edition.isFixture) continue;
+      if (!await source.hasContentFor(edition.id)) continue;
+
+      final List<Ayah> ayat = await source.loadAyat(edition.id);
+      expect(
+        ayat.first.hasWords,
+        isTrue,
+        reason: '\${edition.id} should carry word glosses',
+      );
+      expect(ayat.first.words.first.hasArabic, isTrue);
+      expect(ayat.first.words.first.hasTranslation, isTrue);
+    }
+  });
+
   test('a complete edition matches the surah index', () async {
     // Any edition claiming the standard numbering must actually line up with
     // it, surah by surah — an off-by-one in an import shows up here.

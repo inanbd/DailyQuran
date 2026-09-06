@@ -23,6 +23,7 @@ import '../../shared/widgets/ayah_view.dart';
 import '../../shared/widgets/notice_banner.dart';
 import '../../shared/widgets/progress_bar.dart';
 import '../../shared/widgets/state_views.dart';
+import 'editions_sheet.dart';
 import 'surahs_sheet.dart';
 import 'today_controller.dart';
 
@@ -261,6 +262,7 @@ class _TodayBody extends ConsumerWidget {
               languageMode: preferences.languageMode,
               textScale: preferences.textSize.scale,
               showTransliteration: preferences.showTransliteration,
+              showWordByWord: preferences.showWordByWord,
               translationIsRightToLeft: edition.isRightToLeft,
               onSpeakTranslation: canSpeak
                   ? () => ref.read(speechControllerProvider.notifier).toggle(
@@ -333,11 +335,12 @@ class _AyahMeta extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          edition.titleEnglish,
-          style: AppTypography.metadata.copyWith(color: colors.textPrimary),
+        // Tapping the translation's name is how it is changed, which puts
+        // the control next to the thing it names rather than in a menu.
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: EditionSwitcher(edition: edition),
         ),
-        const SizedBox(height: 2),
         Text(
           parts.join(' · '),
           style: AppTypography.metadata.copyWith(color: colors.textSecondary),

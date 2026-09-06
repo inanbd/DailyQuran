@@ -50,6 +50,11 @@ class SettingsScreen extends ConsumerWidget {
                 value: preferences.showTransliteration ? 'On' : 'Off',
                 onTap: () => context.go(Routes.settingsReading),
               ),
+              SettingsRow(
+                label: 'Word by word',
+                value: preferences.showWordByWord ? 'On' : 'Off',
+                onTap: () => context.go(Routes.settingsReading),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.xl),

@@ -9,6 +9,7 @@ class UserPreferences {
   const UserPreferences({
     required this.languageMode,
     required this.showTransliteration,
+    required this.showWordByWord,
     required this.themeMode,
     required this.textSize,
     required this.readingOrder,
@@ -19,6 +20,7 @@ class UserPreferences {
   static const UserPreferences defaults = UserPreferences(
     languageMode: LanguageMode.both,
     showTransliteration: false,
+    showWordByWord: false,
     themeMode: AppThemeMode.system,
     textSize: TextSizePreference.standard,
     readingOrder: ReadingOrder.sequential,
@@ -33,6 +35,13 @@ class UserPreferences {
   /// carries one — the app never transliterates anything itself.
   final bool showTransliteration;
 
+  /// Whether to show each Arabic word with the gloss the source gives it.
+  ///
+  /// A word-level reading aid, not a second translation: it says what each
+  /// word means on its own. Off by default, and only ever shown where a word
+  /// index has actually been installed.
+  final bool showWordByWord;
+
   final AppThemeMode themeMode;
   final TextSizePreference textSize;
   final ReadingOrder readingOrder;
@@ -44,6 +53,7 @@ class UserPreferences {
   UserPreferences copyWith({
     LanguageMode? languageMode,
     bool? showTransliteration,
+    bool? showWordByWord,
     AppThemeMode? themeMode,
     TextSizePreference? textSize,
     ReadingOrder? readingOrder,
@@ -53,6 +63,7 @@ class UserPreferences {
     return UserPreferences(
       languageMode: languageMode ?? this.languageMode,
       showTransliteration: showTransliteration ?? this.showTransliteration,
+      showWordByWord: showWordByWord ?? this.showWordByWord,
       themeMode: themeMode ?? this.themeMode,
       textSize: textSize ?? this.textSize,
       readingOrder: readingOrder ?? this.readingOrder,

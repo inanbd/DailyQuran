@@ -32,7 +32,10 @@
       "progressScope": "quran",
       "verification": "verified",
       "source": {
-        "name": "Not yet imported"
+        "name": "quran-json (Risan Bagja Pradana); Uthmani text from The Noble Qur'an Encyclopedia, translations from Tanzil.net",
+        "url": "https://github.com/risan/quran-json",
+        "licence": "CC BY-SA 4.0",
+        "retrievedAt": "2026-09-06T21:53:20.695793Z"
       }
     },
     {
@@ -52,7 +55,7 @@
         "url": "https://github.com/risan/quran-json",
         "translator": "Umm Muhammad (Saheeh International)",
         "licence": "CC BY-SA 4.0",
-        "retrievedAt": "2026-09-06T20:53:54.438095Z"
+        "retrievedAt": "2026-09-06T21:53:21.941775Z"
       }
     },
     {
@@ -69,7 +72,11 @@
       "progressScope": "quran",
       "verification": "verified",
       "source": {
-        "name": "Not yet imported"
+        "name": "quran-json (Risan Bagja Pradana); Uthmani text from The Noble Qur'an Encyclopedia, translations from Tanzil.net",
+        "url": "https://github.com/risan/quran-json",
+        "translator": "Abul A'la Maududi",
+        "licence": "CC BY-SA 4.0",
+        "retrievedAt": "2026-09-06T21:53:22.844587Z"
       }
     },
     {
@@ -85,7 +92,11 @@
       "progressScope": "quran",
       "verification": "verified",
       "source": {
-        "name": "Not yet imported"
+        "name": "quran-json (Risan Bagja Pradana); Uthmani text from The Noble Qur'an Encyclopedia, translations from Tanzil.net",
+        "url": "https://github.com/risan/quran-json",
+        "translator": "Muhammad Hamidullah",
+        "licence": "CC BY-SA 4.0",
+        "retrievedAt": "2026-09-06T21:53:23.659289Z"
       }
     },
     {
@@ -101,7 +112,11 @@
       "progressScope": "quran",
       "verification": "verified",
       "source": {
-        "name": "Not yet imported"
+        "name": "quran-json (Risan Bagja Pradana); Uthmani text from The Noble Qur'an Encyclopedia, translations from Tanzil.net",
+        "url": "https://github.com/risan/quran-json",
+        "translator": "Muhammad Isa García",
+        "licence": "CC BY-SA 4.0",
+        "retrievedAt": "2026-09-06T21:53:24.386367Z"
       }
     },
     {
@@ -117,7 +132,11 @@
       "progressScope": "quran",
       "verification": "verified",
       "source": {
-        "name": "Not yet imported"
+        "name": "quran-json (Risan Bagja Pradana); Uthmani text from The Noble Qur'an Encyclopedia, translations from Tanzil.net",
+        "url": "https://github.com/risan/quran-json",
+        "translator": "Elmir Kuliev",
+        "licence": "CC BY-SA 4.0",
+        "retrievedAt": "2026-09-06T21:53:25.477050Z"
       }
     },
     {
@@ -133,7 +152,11 @@
       "progressScope": "quran",
       "verification": "verified",
       "source": {
-        "name": "Not yet imported"
+        "name": "quran-json (Risan Bagja Pradana); Uthmani text from The Noble Qur'an Encyclopedia, translations from Tanzil.net",
+        "url": "https://github.com/risan/quran-json",
+        "translator": "Muhiuddin Khan",
+        "licence": "CC BY-SA 4.0",
+        "retrievedAt": "2026-09-06T21:53:26.200561Z"
       }
     }
   ]

@@ -42,6 +42,10 @@ abstract interface class ProgressRepository {
   /// The lowest unread ordinal, or null when everything has been read.
   Future<int?> firstUnreadOrdinal(String scope, int totalAyah);
 
+  /// How many ayat were read at or after [since] — how much of a reading plan's
+  /// portion for the current period is done.
+  Future<int> readCountSince(String scope, DateTime since);
+
   /// Clears all read state for a scope so it can be read again.
   Future<ReadingProgress> resetScope(String scope, int totalAyah);
 }

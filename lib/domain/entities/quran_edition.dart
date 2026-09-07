@@ -7,6 +7,13 @@ import 'enums.dart';
 ///
 /// Everything here is bibliographic metadata about the edition plus provenance
 /// for its text. It never contains Qur'an text itself.
+/// Unicode U+2068 FIRST STRONG ISOLATE: opens a run whose direction is taken
+/// from its own first strong character rather than the text around it.
+const int _firstStrongIsolate = 0x2068;
+
+/// Unicode U+2069 POP DIRECTIONAL ISOLATE: closes the run above.
+const int _popDirectionalIsolate = 0x2069;
+
 @immutable
 class QuranEdition {
   const QuranEdition({
@@ -20,6 +27,7 @@ class QuranEdition {
     required this.source,
     required this.verification,
     this.languageName = 'English',
+    this.languageNativeName,
     this.languageCode = 'en-US',
     this.isRightToLeft = false,
     this.translatorArabic,
@@ -48,6 +56,33 @@ class QuranEdition {
 
   /// Human-readable language of the translation, e.g. `English`.
   final String languageName;
+
+  /// The language's own name for itself, e.g. `اردو` for Urdu. Null where the
+  /// catalog gives none, and always null where it would only repeat
+  /// [languageName].
+  final String? languageNativeName;
+
+  /// The language as it is shown to the reader: its English name, followed by
+  /// its own name where the two differ, e.g. `Urdu (اردو)`.
+  ///
+  /// Both are kept. The English name is what a reader scanning the list is
+  /// most likely to be searching for; the native name is how a speaker of that
+  /// language recognises it at a glance.
+  ///
+  /// The native name is wrapped in a Unicode isolate so a right-to-left one —
+  /// اردو, العربية — cannot reorder the brackets around it. Without it the
+  /// closing bracket is a direction-neutral character next to RTL text and
+  /// bidi resolution drags it to the wrong side, giving `Urdu )اردو(`.
+  String get languageLabel {
+    final String? native = languageNativeName;
+    if (native == null || native.isEmpty || native == languageName) {
+      return languageName;
+    }
+    final String isolated = String.fromCharCode(_firstStrongIsolate) +
+        native +
+        String.fromCharCode(_popDirectionalIsolate);
+    return '$languageName ($isolated)';
+  }
 
   /// BCP-47 tag for the translation, used to pick a text-to-speech voice.
   final String languageCode;
@@ -111,6 +146,7 @@ class QuranEdition {
       translatorArabic: translatorArabic,
       description: description,
       languageName: languageName,
+      languageNativeName: languageNativeName,
       languageCode: languageCode,
       isRightToLeft: isRightToLeft,
       totalAyah: totalAyah ?? this.totalAyah,

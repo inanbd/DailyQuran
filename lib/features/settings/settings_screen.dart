@@ -25,6 +25,8 @@ class SettingsScreen extends ConsumerWidget {
         ref.watch(notificationPreferencesProvider);
     final AsyncValue<QuranEdition?> current =
         ref.watch(currentEditionProvider);
+    final AsyncValue<QuranEdition?> second =
+        ref.watch(secondaryEditionProvider);
     final bool use24Hour = MediaQuery.alwaysUse24HourFormatOf(context);
 
     return AppPage(
@@ -39,6 +41,16 @@ class SettingsScreen extends ConsumerWidget {
                 label: 'Translation',
                 value: current.value?.titleEnglish ?? 'Not chosen',
                 onTap: () => context.go(Routes.library),
+              ),
+              SettingsRow(
+                label: 'Second translation',
+                value: second.value?.titleEnglish ?? 'None',
+                onTap: () => context.go(Routes.settingsSecondTranslation),
+              ),
+              SettingsRow(
+                label: 'Reading plan',
+                value: SettingsLabels.planName(preferences.plan.kind),
+                onTap: () => context.go(Routes.settingsPlan),
               ),
               SettingsRow(
                 label: 'Ayah text',
@@ -69,6 +81,12 @@ class SettingsScreen extends ConsumerWidget {
               SettingsRow(
                 label: 'Frequency',
                 value: SettingsLabels.frequency(notifications),
+                onTap: () => context.go(Routes.settingsNotifications),
+              ),
+              SettingsRow(
+                label: 'What it says',
+                value:
+                    SettingsLabels.reminderContentName(notifications.content),
                 onTap: () => context.go(Routes.settingsNotifications),
               ),
               SettingsRow(

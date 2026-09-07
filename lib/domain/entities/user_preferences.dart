@@ -1,6 +1,7 @@
 import 'package:meta/meta.dart';
 
 import 'enums.dart';
+import 'reading_plan.dart';
 
 /// Reading and appearance preferences. Small enough to live in key-value
 /// storage; nothing here is personal data.
@@ -14,7 +15,9 @@ class UserPreferences {
     required this.textSize,
     required this.readingOrder,
     required this.onboardingComplete,
+    this.plan = ReadingPlan.defaults,
     this.currentEditionId,
+    this.secondaryEditionId,
   });
 
   static const UserPreferences defaults = UserPreferences(
@@ -47,8 +50,33 @@ class UserPreferences {
   final ReadingOrder readingOrder;
   final bool onboardingComplete;
 
+  /// How much of the Qur'an a reading period asks for.
+  ///
+  /// Defaults to one ayah a period, so a reader who never opens the plan
+  /// screen — and every reader upgrading from a version without plans — sees
+  /// no change at all.
+  final ReadingPlan plan;
+
   /// The edition the Today screen reads from. Null before onboarding finishes.
   final String? currentEditionId;
+
+  /// A second translation shown beneath the first, or null for just the one.
+  ///
+  /// Two is the cap, and it is a cap on *translations*, not on panes: the
+  /// Arabic is not one of the two. Beyond two the ayah stops being the thing
+  /// on the screen and the page becomes a comparison table, which is a
+  /// different app from this one.
+  ///
+  /// Only ever set to an edition sharing [currentEditionId]'s progress scope,
+  /// so both columns are the same ayah and one mark-as-read still means one
+  /// ayah read.
+  final String? secondaryEditionId;
+
+  /// The translations on screen, in the order they are shown. One or two.
+  List<String> get editionIds => <String>[
+        ?currentEditionId,
+        ?secondaryEditionId,
+      ];
 
   UserPreferences copyWith({
     LanguageMode? languageMode,
@@ -58,7 +86,13 @@ class UserPreferences {
     TextSizePreference? textSize,
     ReadingOrder? readingOrder,
     bool? onboardingComplete,
+    ReadingPlan? plan,
     String? currentEditionId,
+    String? secondaryEditionId,
+    /// Drops the second translation. Needed because a null
+    /// [secondaryEditionId] above means "leave it alone", which would make
+    /// turning the second translation back off impossible to express.
+    bool clearSecondaryEdition = false,
   }) {
     return UserPreferences(
       languageMode: languageMode ?? this.languageMode,
@@ -68,7 +102,11 @@ class UserPreferences {
       textSize: textSize ?? this.textSize,
       readingOrder: readingOrder ?? this.readingOrder,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
+      plan: plan ?? this.plan,
       currentEditionId: currentEditionId ?? this.currentEditionId,
+      secondaryEditionId: clearSecondaryEdition
+          ? null
+          : secondaryEditionId ?? this.secondaryEditionId,
     );
   }
 }

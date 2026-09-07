@@ -168,11 +168,13 @@ void main() {
     );
   });
 
-  test('an ayah stored before glosses existed reads back without them',
+  test('upgrading from v1 clears the stored text so glosses can arrive',
       () async {
-    // The column is null on every pre-existing row, which must read as "no
-    // words" rather than crash. The glosses arrive when the edition is
-    // reinstalled.
+    // Text stored before glosses existed has a null words column, and nothing
+    // re-imports an edition that is already installed — so leaving those rows
+    // in place would keep word-by-word permanently blank for a reader who
+    // upgraded. Clearing them puts the edition back through the install path,
+    // which joins the glosses on.
     await seedV1();
 
     final AppDatabase upgraded = AppDatabase(
@@ -183,9 +185,76 @@ void main() {
 
     final Ayah? ayah = await AyahDao(upgraded)
         .byVerseKey('saheeh_international', '2:255');
-    expect(ayah, isNotNull);
-    expect(ayah!.hasWords, isFalse);
-    expect(ayah.translationText, 'A translation.');
+    expect(ayah, isNull);
+    expect(await AyahDao(upgraded).countFor('saheeh_international'), 0);
+  });
+
+  test('a v2 install stranded with wordless text is cleared too', () async {
+    // v2 added the words column but never refilled the rows already stored, so
+    // anyone who upgraded to it is sitting on text that can never show
+    // glosses. They must be rescued by the same clearing as a v1 reader.
+    final Database db = await databaseFactoryFfi.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: 2,
+        onCreate: (Database db, int version) async {
+          await db.execute(_v1Ayah);
+          await db.execute(_v1Progress);
+          await db.execute(_v1Read);
+          await db.execute(_v1Favourites);
+          await db.execute('ALTER TABLE ayah ADD COLUMN words TEXT');
+        },
+      ),
+    );
+    await db.insert('ayah', <String, Object?>{
+      'id': 'saheeh_international:2:255',
+      'edition_id': 'saheeh_international',
+      'ordinal': 262,
+      'surah_number': 2,
+      'ayah_number': 255,
+      'verse_key': '2:255',
+      'arabic_text': 'نص',
+      'translation_text': 'A translation.',
+    });
+    await db.insert('reading_progress', <String, Object?>{
+      'scope': 'quran',
+      'current_ordinal': 262,
+      'started_at': 1700000000000,
+      'last_read_at': 1700000900000,
+    });
+    await db.close();
+
+    final AppDatabase upgraded = AppDatabase(
+      factoryOverride: databaseFactoryFfi,
+      pathOverride: path,
+    );
+    addTearDown(upgraded.close);
+
+    expect(await AyahDao(upgraded).countFor('saheeh_international'), 0);
+    final ReadingProgress progress =
+        await ProgressDao(upgraded).progressFor('quran', 6236);
+    expect(progress.currentOrdinal, 262);
+  });
+
+  test('upgrading from v1 keeps the reader’s place while the text is refetched',
+      () async {
+    // The clearing above must never take progress or favourites with it.
+    await seedV1();
+
+    final AppDatabase upgraded = AppDatabase(
+      factoryOverride: databaseFactoryFfi,
+      pathOverride: path,
+    );
+    addTearDown(upgraded.close);
+
+    final ReadingProgress progress =
+        await ProgressDao(upgraded).progressFor('quran', 6236);
+    expect(progress.currentOrdinal, 262);
+    expect(progress.totalRead, 1);
+    expect(
+      await FavouritesDao(upgraded).isFavourite('quran', '2:255'),
+      isTrue,
+    );
   });
 
   test('words round-trip through storage', () async {

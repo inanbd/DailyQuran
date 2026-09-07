@@ -13,7 +13,11 @@ import '../data/repositories/favourites_repository_impl.dart';
 import '../data/repositories/progress_repository_impl.dart';
 import '../data/repositories/quran_repository_impl.dart';
 import '../data/speech/flutter_tts_speech_synthesizer.dart';
+import '../domain/entities/ayah.dart';
+import '../domain/entities/enums.dart';
 import '../domain/entities/notification_preferences.dart';
+import '../domain/entities/quran_edition.dart';
+import '../domain/entities/reading_progress.dart';
 import '../domain/entities/user_preferences.dart';
 import '../domain/repositories/favourites_repository.dart';
 import '../domain/repositories/notification_scheduler.dart';
@@ -22,6 +26,9 @@ import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/quran_content_source.dart';
 import '../domain/repositories/quran_repository.dart';
 import '../domain/repositories/speech_synthesizer.dart';
+import '../domain/services/plan_scheduler.dart';
+import '../domain/services/reminder_message_composer.dart';
+import '../domain/services/reminder_schedule.dart';
 
 /// Thrown if a provider that must be overridden at startup is read directly.
 Never _mustOverride(String name) =>
@@ -131,8 +138,31 @@ class UserPreferencesController extends Notifier<UserPreferences> {
     await ref.read(preferencesRepositoryProvider).saveUserPreferences(next);
   }
 
-  Future<void> setCurrentEdition(String editionId) =>
-      update(state.copyWith(currentEditionId: editionId));
+  /// Opens [editionId] as the translation being read.
+  ///
+  /// Choosing the one already showing underneath promotes it rather than
+  /// leaving the same translation stacked on itself: the reader plainly meant
+  /// to read it, and two identical columns would be nothing but a bug.
+  Future<void> setCurrentEdition(String editionId) {
+    return update(
+      state.copyWith(
+        currentEditionId: editionId,
+        clearSecondaryEdition: state.secondaryEditionId == editionId,
+      ),
+    );
+  }
+
+  /// Shows [editionId] beneath the current translation, or clears the second
+  /// translation when given null.
+  ///
+  /// Asking for the translation already on top is treated as asking for one
+  /// translation, for the same reason as above.
+  Future<void> setSecondaryEdition(String? editionId) {
+    if (editionId == null || editionId == state.currentEditionId) {
+      return update(state.copyWith(clearSecondaryEdition: true));
+    }
+    return update(state.copyWith(secondaryEditionId: editionId));
+  }
 
   Future<void> completeOnboarding() =>
       update(state.copyWith(onboardingComplete: true));
@@ -175,11 +205,90 @@ class NotificationPreferencesController
       await scheduler.reschedule(
         preferences: state,
         editionId: ref.read(userPreferencesProvider).currentEditionId,
+        message: await _composeMessage(),
       );
     } on Object catch (error, stack) {
       debugPrint('Daily Quran: could not arm reminders: $error\n$stack');
     }
     ref.invalidate(reminderReadinessProvider);
+  }
+
+  /// The text the next reminder should carry.
+  ///
+  /// Reads repositories directly rather than the Today controller, which would
+  /// be a cycle — the Today screen watches these preferences to know where its
+  /// reading period starts.
+  ///
+  /// Any failure falls back to the plain invitation. A reminder that reveals
+  /// less than the reader asked for is a small disappointment; one that fails
+  /// to arm at all is a broken feature.
+  Future<ReminderMessage> _composeMessage() async {
+    // Nothing will be armed, so there is nothing to say. Worth checking first:
+    // rescheduling with reminders off still runs on every launch, to clear
+    // anything the OS is holding.
+    if (!state.enabled) return ReminderMessage.invitation;
+
+    final UserPreferences preferences = ref.read(userPreferencesProvider);
+
+    // The default install — one ayah a period, revealing nothing — has a fixed
+    // answer, so nothing is added to startup for a reader who changed neither
+    // setting.
+    if (state.content == ReminderContent.invitation &&
+        !preferences.plan.isPaced) {
+      return ReminderMessage.invitation;
+    }
+
+    final String? editionId = preferences.currentEditionId;
+    if (editionId == null) return ReminderMessage.invitation;
+
+    try {
+      final QuranRepository quran = ref.read(quranRepositoryProvider);
+      final QuranEdition? edition = await quran.edition(editionId);
+      if (edition == null || edition.totalAyah <= 0) {
+        return ReminderMessage.invitation;
+      }
+
+      final ProgressRepository progressRepository =
+          ref.read(progressRepositoryProvider);
+      final ReadingProgress progress = await progressRepository.progressFor(
+        edition.scope,
+        edition.totalAyah,
+      );
+
+      // Sized for the period the reminder will *land* in, not the one being
+      // left: on a catch-up plan those are different numbers, and the reader
+      // should be told the one they are about to be asked for.
+      final DateTime now = ref.read(clockProvider)();
+      final DateTime arrivesAt =
+          ReminderSchedule(state).nextOccurrenceAfter(now) ?? now;
+      final ReadingPortion portion = PlanScheduler.resolve(
+        plan: preferences.plan,
+        progress: progress,
+        notificationPreferences: state,
+        readThisPeriod: 0,
+        now: arrivesAt,
+      );
+
+      // The ayah named is the one the reader will actually land on — the first
+      // they have not read, never wherever they last browsed to.
+      Ayah? ayah;
+      if (state.content != ReminderContent.invitation) {
+        final int? ordinal = await progressRepository.firstUnreadOrdinal(
+          edition.scope,
+          edition.totalAyah,
+        );
+        if (ordinal != null) ayah = await quran.ayahAt(editionId, ordinal);
+      }
+
+      return ReminderMessageComposer.compose(
+        content: state.content,
+        ayatToRead: portion.target,
+        ayah: ayah,
+      );
+    } on Object catch (error) {
+      debugPrint('Daily Quran: falling back to a plain reminder ($error)');
+      return ReminderMessage.invitation;
+    }
   }
 }
 

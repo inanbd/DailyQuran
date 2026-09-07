@@ -77,6 +77,43 @@ enum NotificationFrequency {
   }
 }
 
+/// How much of the reading a reminder is allowed to reveal.
+///
+/// Ordered from least to most disclosed, because that is the axis the reader is
+/// actually choosing along: a notification lands on a lock screen, where anyone
+/// nearby can read it. [invitation] is the default for that reason, and the
+/// only value that carries nothing about the reading at all.
+enum ReminderContent {
+  /// Just an invitation to open the app. Reveals nothing.
+  invitation('invitation'),
+
+  /// The citation and the size of the portion — "Al-Baqarah 2:1 · 18 ayat".
+  /// A reference, not scripture: no Qur'an text is in it.
+  reference('reference'),
+
+  /// The translation of the first ayah of the portion.
+  translation('translation'),
+
+  /// The Arabic of the first ayah of the portion.
+  arabic('arabic');
+
+  const ReminderContent(this.storageKey);
+
+  final String storageKey;
+
+  /// Whether this setting puts Qur'an text — Arabic or a translation of it —
+  /// on the reader's lock screen.
+  bool get carriesQuranText =>
+      this == ReminderContent.translation || this == ReminderContent.arabic;
+
+  static ReminderContent fromStorage(String? value) {
+    return ReminderContent.values.firstWhere(
+      (ReminderContent content) => content.storageKey == value,
+      orElse: () => ReminderContent.invitation,
+    );
+  }
+}
+
 /// Order in which ayat are delivered. Only [sequential] ships in the MVP;
 /// [random] exists so the scheduling code has a seam to grow into.
 enum ReadingOrder {

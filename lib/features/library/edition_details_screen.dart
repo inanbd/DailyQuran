@@ -157,7 +157,7 @@ class _Details extends ConsumerWidget {
   static String _subtitle(QuranEdition edition) {
     final List<String> parts = <String>[
       if (edition.translator.isNotEmpty) edition.translator,
-      edition.languageName,
+      edition.languageLabel,
       '${Formatting.count(edition.totalAyah)} ayat',
     ];
     return parts.join(' · ');

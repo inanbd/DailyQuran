@@ -11,7 +11,7 @@ class AppDatabase {
   AppDatabase({this.factoryOverride, this.pathOverride});
 
   static const String fileName = 'daily_quran.db';
-  static const int schemaVersion = 2;
+  static const int schemaVersion = 3;
 
   static const String editionsTable = 'editions';
   static const String ayahTable = 'ayah';
@@ -59,16 +59,49 @@ class AppDatabase {
           if (oldVersion < 2) {
             // Word glosses arrived after the first release. Adding the column
             // leaves it null on every existing row, which reads back as an
-            // ayah with no words until the edition is reinstalled.
+            // ayah with no words.
             await db.execute(
               'ALTER TABLE $ayahTable ADD COLUMN words TEXT',
             );
+          }
+          if (oldVersion < 3) {
+            // v2 added the column but nothing filled it: an edition that is
+            // already installed is never re-imported, so every ayah stored
+            // before the upgrade kept a null words column and word-by-word
+            // stayed blank for the edition the reader was already in. Clearing
+            // the stored text sends each installed edition back through the
+            // normal install path on next open, which joins the glosses on.
+            //
+            // Deliberately keyed to `< 3` rather than folded into the step
+            // above: a reader who already upgraded to v2 is sitting on exactly
+            // those wordless rows, and fixing only the v1 path would leave
+            // them stranded.
+            //
+            // Progress and favourites live in their own tables keyed by verse,
+            // so the reader's place and saved ayat survive untouched.
+            await _clearIfPresent(db, ayahTable);
+            await _clearIfPresent(db, surahsTable);
           }
         },
       ),
     );
     _db = db;
     return db;
+  }
+
+  /// Empties a table, tolerating its absence.
+  ///
+  /// Migrations run against whatever a reader's install actually has, which is
+  /// not always what the schema of that version says it should: a table added
+  /// mid-version, or dropped by a failed earlier upgrade, must not turn a
+  /// migration into a crash on launch.
+  static Future<void> _clearIfPresent(Database db, String table) async {
+    final List<Map<String, Object?>> found = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      <Object?>[table],
+    );
+    if (found.isEmpty) return;
+    await db.delete(table);
   }
 
   static Future<void> _createSchema(Database db) async {

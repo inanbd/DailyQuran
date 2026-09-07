@@ -1,6 +1,7 @@
 import '../../core/utils/formatting.dart';
 import '../../domain/entities/enums.dart';
 import '../../domain/entities/notification_preferences.dart';
+import '../../domain/entities/reading_plan.dart';
 import '../../domain/entities/reminder_readiness.dart';
 
 /// Human-readable names for preference values. Kept in one place so the
@@ -38,6 +39,46 @@ abstract final class SettingsLabels {
         return 'Large';
       case TextSizePreference.extraLarge:
         return 'Extra large';
+    }
+  }
+
+  static String planName(ReadingPlanKind kind) {
+    switch (kind) {
+      case ReadingPlanKind.oneAyah:
+        return 'One ayah a day';
+      case ReadingPlanKind.oneMonth:
+        return 'Finish in a month';
+      case ReadingPlanKind.oneYear:
+        return 'Finish in a year';
+    }
+  }
+
+  /// What a reminder will say, as the example itself rather than a description
+  /// of one — the reader is choosing what appears on their lock screen, so the
+  /// most useful thing to show them is the text.
+  static String reminderContentName(ReminderContent content) {
+    switch (content) {
+      case ReminderContent.invitation:
+        return 'Just an invitation';
+      case ReminderContent.reference:
+        return 'Which ayah is next';
+      case ReminderContent.translation:
+        return 'The translation';
+      case ReminderContent.arabic:
+        return 'The Arabic';
+    }
+  }
+
+  static String reminderContentExample(ReminderContent content) {
+    switch (content) {
+      case ReminderContent.invitation:
+        return '“Your next ayah is ready.”';
+      case ReminderContent.reference:
+        return '“Al-Baqarah 2:255” — the citation only, no Qur’an text.';
+      case ReminderContent.translation:
+        return '“Allah — there is no deity except Him…” on your lock screen.';
+      case ReminderContent.arabic:
+        return 'The ayah’s Arabic on your lock screen.';
     }
   }
 

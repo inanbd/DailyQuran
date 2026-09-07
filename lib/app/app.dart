@@ -40,6 +40,15 @@ class _DailyQuranAppState extends ConsumerState<DailyQuranApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      // Leaving the app is the moment a reminder has to be re-armed. An OS
+      // alarm carries fixed text, so one that names an ayah — or counts out a
+      // plan's portion — would otherwise still be describing the reading as it
+      // stood when the app last started. Doing it here, rather than after every
+      // ayah, keeps it to once a session.
+      ref.read(notificationPreferencesProvider.notifier).applyToScheduler();
+      return;
+    }
     if (state != AppLifecycleState.resumed) return;
     // The reader may have changed notification permission in system settings,
     // and enough time may have passed for the reading to move on.
@@ -77,6 +86,26 @@ class _DailyQuranAppState extends ConsumerState<DailyQuranApp>
       final ReminderReadiness? before = previous?.value;
       final ReminderReadiness? after = next.value;
       if (before == null || after == null || before == after) return;
+      ref.read(notificationPreferencesProvider.notifier).applyToScheduler();
+    });
+
+    // A reminder that names an ayah cannot be composed until an edition's text
+    // is actually in local storage — and startup arms reminders before the
+    // first install has happened, so on a first launch there is nothing to
+    // name. This re-arms once there is.
+    //
+    // Only for readers who asked for the ayah to be named: on the default
+    // setting the text is fixed, and re-arming would be a cancel-and-schedule
+    // for no change at all.
+    ref.listen(todayControllerProvider, (
+      AsyncValue<TodayState>? previous,
+      AsyncValue<TodayState> next,
+    ) {
+      if (previous?.value?.ayah != null || next.value?.ayah == null) return;
+      if (ref.read(notificationPreferencesProvider).content ==
+          ReminderContent.invitation) {
+        return;
+      }
       ref.read(notificationPreferencesProvider.notifier).applyToScheduler();
     });
 

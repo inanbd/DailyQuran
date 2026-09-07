@@ -55,6 +55,7 @@ class NotificationPreferences {
     required this.frequency,
     required this.selectedWeekdays,
     required this.time,
+    this.content = ReminderContent.invitation,
     this.timezone,
     this.anchorDate,
   });
@@ -78,6 +79,13 @@ class NotificationPreferences {
 
   final TimeOfDayValue time;
 
+  /// How much of the reading a reminder is allowed to reveal.
+  ///
+  /// Defaults to revealing nothing, because a notification is read on a lock
+  /// screen by whoever is looking at it. Only the reader can decide that
+  /// tradeoff, so only the reader changes it.
+  final ReminderContent content;
+
   /// The IANA zone last used to schedule. Recorded only so the app can notice
   /// the device moved and reschedule; it is never used to override the device.
   final String? timezone;
@@ -91,6 +99,7 @@ class NotificationPreferences {
     NotificationFrequency? frequency,
     Set<int>? selectedWeekdays,
     TimeOfDayValue? time,
+    ReminderContent? content,
     String? timezone,
     DateTime? anchorDate,
   }) {
@@ -99,6 +108,7 @@ class NotificationPreferences {
       frequency: frequency ?? this.frequency,
       selectedWeekdays: selectedWeekdays ?? this.selectedWeekdays,
       time: time ?? this.time,
+      content: content ?? this.content,
       timezone: timezone ?? this.timezone,
       anchorDate: anchorDate ?? this.anchorDate,
     );

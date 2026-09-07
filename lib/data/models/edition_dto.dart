@@ -21,6 +21,7 @@ abstract final class EditionDto {
       translatorArabic: json['translatorArabic'] as String?,
       description: (json['description'] as String?) ?? '',
       languageName: (json['languageName'] as String?) ?? 'English',
+      languageNativeName: (json['languageNativeName'] as String?),
       languageCode: (json['languageCode'] as String?) ?? 'en-US',
       isRightToLeft:
           (json['languageDirection'] as String?)?.toLowerCase() == 'rtl',

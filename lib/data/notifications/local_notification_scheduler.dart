@@ -76,6 +76,11 @@ class LocalNotificationScheduler implements NotificationScheduler {
   /// re-armed whenever the app runs.
   static const int _intervalWindow = 30;
 
+  /// Body length past which a notification is made expandable rather than
+  /// truncated. Comfortably longer than any invitation or citation, so only the
+  /// settings that carry actual text cross it.
+  static const int _expandableAfter = 48;
+
   @override
   Stream<QuranDeepLink> get deepLinks => _deepLinks.stream;
 
@@ -237,6 +242,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
   Future<void> reschedule({
     required NotificationPreferences preferences,
     required String? editionId,
+    ReminderMessage message = ReminderMessage.invitation,
   }) async {
     await initialize();
     // Re-resolve the device zone: this is the moment a timezone change or a
@@ -259,12 +265,12 @@ class LocalNotificationScheduler implements NotificationScheduler {
             ? AndroidScheduleMode.exactAllowWhileIdle
             : AndroidScheduleMode.inexactAllowWhileIdle;
 
-    // Neither the title nor the body ever carries Qur'an text — a reminder
-    // only invites the reader to open the app. Nor does it name the
-    // translation: which edition is being read is the reader's business, not a
-    // notification's.
-    const String title = 'Today’s Ayah';
-    const String body = 'Your next ayah is ready.';
+    // Whatever the reader chose to have revealed, composed upstream. This layer
+    // does not decide it and cannot widen it: by default it is an invitation
+    // with nothing in it, and it never names the translation — which edition is
+    // being read is the reader's business, not a notification's.
+    final String title = message.title;
+    final String body = message.body;
     final String payload = jsonEncode(<String, Object?>{
       'type': 'reminder',
       'editionId': editionId,
@@ -329,18 +335,28 @@ class LocalNotificationScheduler implements NotificationScheduler {
         title,
         body,
         first,
-        const NotificationDetails(
+        NotificationDetails(
           android: AndroidNotificationDetails(
             channelId,
             channelName,
             channelDescription: channelDescription,
             importance: Importance.defaultImportance,
             priority: Priority.defaultPriority,
-            // The ayah itself is never put in the notification — the reminder
-            // only invites the reader to open the app.
-            styleInformation: DefaultStyleInformation(false, false),
+            // A one-line body is left as one line. A reader who asked for the
+            // ayah's text gets it expandable instead, because Android would
+            // otherwise cut a translation off mid-sentence — which is a worse
+            // way to show scripture than not showing it at all. Both disable
+            // HTML parsing, so the text is rendered exactly as it is stored.
+            styleInformation: body.length > _expandableAfter
+                ? BigTextStyleInformation(
+                    body,
+                    htmlFormatBigText: false,
+                    contentTitle: title,
+                    htmlFormatContentTitle: false,
+                  )
+                : const DefaultStyleInformation(false, false),
           ),
-          iOS: DarwinNotificationDetails(
+          iOS: const DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: false,
             presentSound: true,

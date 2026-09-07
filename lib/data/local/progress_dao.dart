@@ -130,6 +130,22 @@ class ProgressDao {
         .toSet();
   }
 
+  /// How many ayat in [scope] were read at or after [since].
+  ///
+  /// This is how much of a plan's portion is done: the period's start goes in,
+  /// and what comes back is what has actually been read in it. Counting rows
+  /// rather than storing a per-day tally means the answer stays correct however
+  /// the reader moved about — reading ahead, going back, changing translation.
+  Future<int> readCountSince(String scope, DateTime since) async {
+    final Database db = await _database.database;
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM ${AppDatabase.readTable} '
+      'WHERE scope = ? AND read_at >= ?',
+      <Object?>[scope, since.millisecondsSinceEpoch],
+    );
+    return Sqflite.firstIntValue(rows) ?? 0;
+  }
+
   /// Lowest unread ordinal in `1..totalAyah`, or null when all are read.
   ///
   /// Resolved with two indexed queries rather than by loading the read set, so

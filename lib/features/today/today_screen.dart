@@ -15,6 +15,7 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/quran_edition.dart';
 import '../../domain/entities/reading_progress.dart';
 import '../../domain/entities/user_preferences.dart';
+import '../../domain/services/plan_scheduler.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
 import '../../shared/theme/app_typography.dart';
@@ -93,7 +94,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         return false;
       },
       child: AppPage(
-        title: 'Today’s Ayah',
+        // A plan asking for more than one ayah makes "Today's Ayah" a
+        // misdescription of what is on the page.
+        title: state.value?.hasPortion ?? false
+            ? 'Today’s Reading'
+            : 'Today’s Ayah',
         actions: <Widget>[_SurahsButton(editionId: state.value?.edition?.id)],
         child: state.when(
           loading: () => const LoadingView(),
@@ -145,7 +150,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     if (current?.ayah?.id != ayahId || current!.isRead) return;
 
     _autoMarked.add(ayahId);
-    ref.read(todayControllerProvider.notifier).markRead();
+    // Marks without turning the page: a dwell timer that also advanced would
+    // walk itself through a whole portion while the reader sat still.
+    ref.read(todayControllerProvider.notifier).markReadInPlace();
   }
 }
 
@@ -264,6 +271,16 @@ class _TodayBody extends ConsumerWidget {
               showTransliteration: preferences.showTransliteration,
               showWordByWord: preferences.showWordByWord,
               translationIsRightToLeft: edition.isRightToLeft,
+              // Today shows one ayah at a time, so the citation below it only
+              // repeats what the screen already says.
+              showReference: false,
+              secondaryTranslation: state.hasSecondTranslation
+                  ? SecondaryTranslation(
+                      text: state.secondaryAyah!.translationText!,
+                      title: state.secondaryEdition!.titleEnglish,
+                      isRightToLeft: state.secondaryEdition!.isRightToLeft,
+                    )
+                  : null,
               onSpeakTranslation: canSpeak
                   ? () => ref.read(speechControllerProvider.notifier).toggle(
                         ayah.id,
@@ -284,6 +301,10 @@ class _TodayBody extends ConsumerWidget {
           // Nothing to look at: the point past which the whole ayah, citation
           // included, has been on screen.
           SizedBox(key: endOfAyahKey, height: AppSpacing.xxl),
+          if (state.hasPortion) ...<Widget>[
+            _PortionBar(portion: state.portion!),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           ReadingProgressBar(
             read: progress.totalRead,
             total: progress.totalAyah,
@@ -313,6 +334,63 @@ class _TodayBody extends ConsumerWidget {
     } else {
       if (state.hasPrevious) controller.goToPrevious();
     }
+  }
+}
+
+/// How far through this reading period's portion the reader is.
+///
+/// Only rendered on a plan that asks for more than one ayah — counting to one
+/// is noise, and it is what the default plan would show every day.
+class _PortionBar extends StatelessWidget {
+  const _PortionBar({required this.portion});
+
+  final ReadingPortion portion;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        ReadingProgressBar(
+          read: portion.read,
+          total: portion.target,
+          label: portion.isComplete
+              ? 'Today’s portion is done'
+              : 'Today · ${Formatting.count(portion.read)} of '
+                  '${Formatting.count(portion.target)}',
+        ),
+        if (portion.isCatchingUp) ...<Widget>[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            // Says why the number grew, without making a scold of it. The plan
+            // spreads what was missed over the days it has left, so the date
+            // holds — which is the whole reason it is asking for more.
+            'More than the usual ${Formatting.count(portion.nominal)}: what '
+            'you missed is spread over the days left, so the plan still '
+            'reaches its date.',
+            style: AppTypography.reference.copyWith(
+              color: colors.textSecondary,
+            ),
+          ),
+        ] else if (portion.isAhead) ...<Widget>[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            // The same sentence the other way up. Reading ahead thins every
+            // remaining day rather than buying a day off, and without saying so
+            // the drop from the advertised rate looks like the plan losing
+            // count of itself.
+            'Fewer than the usual ${Formatting.count(portion.nominal)}: '
+            'reading ahead is taken off the days that remain, so the plan '
+            'finishes on the same date.',
+            style: AppTypography.reference.copyWith(
+              color: colors.textSecondary,
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
 

@@ -32,12 +32,14 @@ void main() {
     required ReadingProgress state,
     required int? firstUnread,
     required DateTime now,
+    bool portionComplete = true,
   }) {
     return ReadingScheduler.resolveTodaysOrdinal(
       progress: state,
       firstUnreadOrdinal: firstUnread,
       notificationPreferences: daily,
       now: now,
+      portionComplete: portionComplete,
     );
   }
 
@@ -65,6 +67,40 @@ void main() {
         now: DateTime(2026, 1, 7, 20, 0),
       ),
       1,
+    );
+  });
+
+  test('carries on through a portion the plan has not finished', () {
+    // Read at 08:30 on a plan asking for more than one: the same period, but
+    // the reading is not done, so it moves on rather than sitting still.
+    expect(
+      resolve(
+        state: progress(
+          currentOrdinal: 1,
+          totalRead: 1,
+          lastReadAt: DateTime(2026, 1, 7, 8, 30),
+        ),
+        firstUnread: 2,
+        now: DateTime(2026, 1, 7, 20, 0),
+        portionComplete: false,
+      ),
+      2,
+    );
+  });
+
+  test('a finished portion holds, however much of it there was', () {
+    // The same reader, an ayah later, having now read the whole portion.
+    expect(
+      resolve(
+        state: progress(
+          currentOrdinal: 4,
+          totalRead: 4,
+          lastReadAt: DateTime(2026, 1, 7, 8, 40),
+        ),
+        firstUnread: 5,
+        now: DateTime(2026, 1, 7, 20, 0),
+      ),
+      4,
     );
   });
 

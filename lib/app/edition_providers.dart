@@ -15,12 +15,18 @@ final FutureProvider<List<QuranEdition>> editionsProvider =
   (Ref ref) => ref.watch(quranRepositoryProvider).editions(),
 );
 
-/// The editions offered to the reader for browsing and selection.
+/// The editions offered to the reader for browsing and selection, A-Z by
+/// translation name.
 ///
 /// The development fixture is placeholder text rather than the Qur'an, so it is
 /// hidden as soon as any verified edition is readable. It stays listed while it
 /// is the only readable content: a fresh checkout ships the fixture alone, and
 /// hiding it there would leave nothing to read until an edition is imported.
+///
+/// Alphabetical rather than catalog order, which is an accident of when each
+/// edition was added and gives the reader no way to predict where a
+/// translation will be. Sorted here rather than in each screen so the
+/// Translations page and the one-tap chooser can never disagree.
 final FutureProvider<List<QuranEdition>> browsableEditionsProvider =
     FutureProvider<List<QuranEdition>>((Ref ref) async {
   final List<QuranEdition> editions =
@@ -29,9 +35,15 @@ final FutureProvider<List<QuranEdition>> browsableEditionsProvider =
   final bool hasVerifiedContent = editions.any(
     (QuranEdition edition) => edition.isReadable && !edition.isFixture,
   );
-  if (!hasVerifiedContent) return editions;
+  final List<QuranEdition> browsable = hasVerifiedContent
+      ? editions.where((QuranEdition edition) => !edition.isFixture).toList()
+      : editions.toList();
 
-  return editions.where((QuranEdition edition) => !edition.isFixture).toList();
+  browsable.sort(
+    (QuranEdition a, QuranEdition b) =>
+        a.titleEnglish.toLowerCase().compareTo(b.titleEnglish.toLowerCase()),
+  );
+  return browsable;
 });
 
 /// An edition paired with the reader's progress through it.
@@ -45,7 +57,8 @@ class LibraryEntry {
   bool get hasStarted => progress.hasStarted || progress.totalRead > 0;
 }
 
-/// The library list: catalog order, each entry carrying its own progress.
+/// The library list in [browsableEditionsProvider]'s A-Z order, each entry
+/// carrying its own progress.
 final FutureProvider<List<LibraryEntry>> libraryProvider =
     FutureProvider<List<LibraryEntry>>((Ref ref) async {
   final List<QuranEdition> editions =
@@ -131,6 +144,17 @@ final FutureProvider<QuranEdition?> currentEditionProvider =
   final String? id = ref.watch(
     userPreferencesProvider
         .select((UserPreferences prefs) => prefs.currentEditionId),
+  );
+  if (id == null) return null;
+  return ref.watch(editionProvider(id).future);
+});
+
+/// The second translation shown under the first, or null for just the one.
+final FutureProvider<QuranEdition?> secondaryEditionProvider =
+    FutureProvider<QuranEdition?>((Ref ref) async {
+  final String? id = ref.watch(
+    userPreferencesProvider
+        .select((UserPreferences prefs) => prefs.secondaryEditionId),
   );
   if (id == null) return null;
   return ref.watch(editionProvider(id).future);

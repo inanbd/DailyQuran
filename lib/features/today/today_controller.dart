@@ -5,12 +5,15 @@ import '../../app/edition_providers.dart';
 import '../../app/providers.dart';
 import '../../core/errors/app_exception.dart';
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/notification_preferences.dart';
 import '../../domain/entities/quran_edition.dart';
 import '../../domain/entities/reading_progress.dart';
 import '../../domain/entities/user_preferences.dart';
 import '../../domain/repositories/progress_repository.dart';
 import '../../domain/repositories/quran_repository.dart';
+import '../../domain/services/plan_scheduler.dart';
 import '../../domain/services/reading_scheduler.dart';
+import '../../domain/services/reminder_schedule.dart';
 
 /// What the Today screen renders.
 @immutable
@@ -18,7 +21,10 @@ class TodayState {
   const TodayState({
     this.edition,
     this.ayah,
+    this.secondaryEdition,
+    this.secondaryAyah,
     this.progress,
+    this.portion,
     this.isRead = false,
   });
 
@@ -31,12 +37,31 @@ class TodayState {
   /// chosen.
   final Ayah? ayah;
 
+  /// The second translation, when the reader has asked for one.
+  final QuranEdition? secondaryEdition;
+
+  /// The same ayah in [secondaryEdition]. Null when there is no second
+  /// translation, and also when that edition simply has no text for this ayah —
+  /// a gap in one translation must not blank the page.
+  final Ayah? secondaryAyah;
+
+  /// Whether a second translation is on screen with text to show.
+  bool get hasSecondTranslation =>
+      secondaryEdition != null && (secondaryAyah?.hasTranslation ?? false);
+
   final ReadingProgress? progress;
+
+  /// What this reading period asks for, and how much of it is done.
+  final ReadingPortion? portion;
 
   /// Whether [ayah] is marked read.
   final bool isRead;
 
   bool get hasEdition => edition != null;
+
+  /// Whether the plan asks for more than one ayah a period. The portion counter
+  /// is worth showing only when there is a portion to count through.
+  bool get hasPortion => (portion?.target ?? 1) > 1;
 
   /// True once every ayah in the edition has been read.
   bool get isComplete => progress?.isComplete ?? false;
@@ -91,12 +116,33 @@ class TodayController extends AsyncNotifier<TodayState> {
     final int? firstUnread =
         await progressRepository.firstUnreadOrdinal(scope, total);
 
+    final NotificationPreferences notificationPreferences =
+        ref.watch(notificationPreferencesProvider);
+    final DateTime now = ref.watch(clockProvider)();
+
+    // How much of this period's portion is already done. Counted from rows in
+    // the read table rather than a running tally, so it stays right however the
+    // reader moved about — ahead, back, or into another translation.
+    final DateTime periodStart =
+        ReminderSchedule(notificationPreferences).currentPeriodStart(now);
+    final int readThisPeriod =
+        await progressRepository.readCountSince(scope, periodStart);
+
+    final ReadingPortion portion = PlanScheduler.resolve(
+      plan: preferences.plan,
+      progress: progress,
+      notificationPreferences: notificationPreferences,
+      readThisPeriod: readThisPeriod,
+      now: now,
+    );
+
     final int ordinal = _pinnedOrdinal ??
         ReadingScheduler.resolveTodaysOrdinal(
           progress: progress,
           firstUnreadOrdinal: firstUnread,
-          notificationPreferences: ref.watch(notificationPreferencesProvider),
-          now: ref.watch(clockProvider)(),
+          notificationPreferences: notificationPreferences,
+          now: now,
+          portionComplete: portion.isComplete,
         );
 
     if (ordinal != progress.currentOrdinal) {
@@ -108,12 +154,52 @@ class TodayController extends AsyncNotifier<TodayState> {
     final bool isRead =
         ayah != null && await progressRepository.isRead(scope, ayah.verseKey);
 
+    final (QuranEdition?, Ayah?) second = await _loadSecond(
+      quranRepository: quranRepository,
+      secondaryId: preferences.secondaryEditionId,
+      primaryId: editionId,
+      scope: scope,
+      ordinal: ordinal,
+    );
+
     return TodayState(
       edition: edition,
       ayah: ayah,
+      secondaryEdition: second.$1,
+      secondaryAyah: second.$2,
       progress: progress,
+      portion: portion,
       isRead: isRead,
     );
+  }
+
+  /// The second translation of the ayah on screen, if one is set up.
+  ///
+  /// Returns nothing rather than throwing whatever goes wrong here. A second
+  /// translation is an extra reading of an ayah the reader can already see, so
+  /// a missing dataset, a different numbering, or an ayah that edition does not
+  /// carry must cost that extra reading and never the page itself.
+  Future<(QuranEdition?, Ayah?)> _loadSecond({
+    required QuranRepository quranRepository,
+    required String? secondaryId,
+    required String primaryId,
+    required String scope,
+    required int ordinal,
+  }) async {
+    if (secondaryId == null || secondaryId == primaryId) {
+      return (null, null);
+    }
+    try {
+      final QuranEdition second =
+          await quranRepository.installEdition(secondaryId);
+      // Ordinals only line up between editions counting the same ayat. Anything
+      // else would put an unrelated ayah under this one, which is worse than
+      // showing no second translation at all.
+      if (second.scope != scope) return (null, null);
+      return (second, await quranRepository.ayahAt(secondaryId, ordinal));
+    } on AppException {
+      return (null, null);
+    }
   }
 
   /// Re-reads everything and lets the position roll forward if a new reading
@@ -124,12 +210,22 @@ class TodayController extends AsyncNotifier<TodayState> {
     await future;
   }
 
-  /// Marks the ayah on screen as read. Only this one — never a range.
-  Future<void> markRead() => _setRead(true);
+  /// Marks the ayah on screen as read and, when the plan is still asking for
+  /// more this period, brings the next one. Only this ayah is ever marked —
+  /// never a range.
+  Future<void> markRead() => _setRead(true, advance: true);
 
-  Future<void> markUnread() => _setRead(false);
+  /// Marks the ayah read without moving off it.
+  ///
+  /// What auto-marking uses. Advancing on a dwell timer would walk a reader
+  /// through a whole portion unattended — every ayah short enough to fit on
+  /// screen would mark and turn itself five seconds later — so reading one
+  /// through marks it and stops there.
+  Future<void> markReadInPlace() => _setRead(true, advance: false);
 
-  Future<void> _setRead(bool read) async {
+  Future<void> markUnread() => _setRead(false, advance: false);
+
+  Future<void> _setRead(bool read, {required bool advance}) async {
     final TodayState? current = state.value;
     final Ayah? ayah = current?.ayah;
     final QuranEdition? edition = current?.edition;
@@ -152,8 +248,10 @@ class TodayController extends AsyncNotifier<TodayState> {
       );
     }
 
-    // Hold the reader on the ayah they just acted on.
-    _pinnedOrdinal = ayah.ordinal;
+    // Advancing means handing the choice back to the reading rule, which holds
+    // position once the portion is finished and moves to the next unread ayah
+    // while it is not. Otherwise the reader stays exactly where they acted.
+    _pinnedOrdinal = advance ? null : ayah.ordinal;
     _invalidateProgressViews();
     ref.invalidateSelf();
     await future;
@@ -211,6 +309,21 @@ class TodayController extends AsyncNotifier<TodayState> {
     await ref
         .read(progressRepositoryProvider)
         .resetScope(edition.scope, edition.totalAyah);
+
+    // A plan working towards a date starts its clock again too. Without this a
+    // fresh reading would inherit a deadline most of which had already gone,
+    // and open on an impossible first portion.
+    final UserPreferences preferences = ref.read(userPreferencesProvider);
+    if (preferences.plan.isPaced) {
+      await ref.read(userPreferencesProvider.notifier).update(
+            preferences.copyWith(
+              plan: preferences.plan.copyWith(
+                startedOn: ref.read(clockProvider)(),
+              ),
+            ),
+          );
+    }
+
     _pinnedOrdinal = null;
     _invalidateProgressViews();
     ref.invalidateSelf();

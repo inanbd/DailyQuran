@@ -7,6 +7,27 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 
+/// A second translation of the ayah already on screen.
+///
+/// Carries the translator's name because two unlabelled translations of the
+/// same ayah are just a repetition the reader has to work out for themselves;
+/// naming them is what makes the pair readable as a comparison.
+@immutable
+class SecondaryTranslation {
+  const SecondaryTranslation({
+    required this.text,
+    required this.title,
+    this.isRightToLeft = false,
+  });
+
+  final String text;
+
+  /// The edition's name, e.g. `Maududi (Urdu)`.
+  final String title;
+
+  final bool isRightToLeft;
+}
+
 /// Renders one ayah as a page of the mushaf.
 ///
 /// The Arabic is shown first and always laid out right-to-left, regardless of
@@ -30,6 +51,7 @@ class AyahView extends StatelessWidget {
     this.showWordByWord = false,
     this.translationIsRightToLeft = false,
     this.showReference = true,
+    this.secondaryTranslation,
     this.onSpeakTranslation,
     this.isSpeakingTranslation = false,
     this.onToggleFavourite,
@@ -54,6 +76,9 @@ class AyahView extends StatelessWidget {
   final bool translationIsRightToLeft;
 
   final bool showReference;
+
+  /// A second reading of the same ayah, shown under the first. Null for one.
+  final SecondaryTranslation? secondaryTranslation;
 
   /// Speaks the translation, or stops it. Null hides the control, which is what
   /// happens on a device with no voice for the translation's language.
@@ -84,6 +109,11 @@ class AyahView extends StatelessWidget {
     // Only where the installed edition actually carries glosses.
     final bool showWords = showWordByWord && ayah.hasWords;
 
+    // A second translation only makes sense underneath a first one. In
+    // Arabic-only mode there is nothing for it to be second to.
+    final SecondaryTranslation? second =
+        showTranslation ? secondaryTranslation : null;
+
     // Speaking is only ever offered for text that is actually on screen.
     final VoidCallback? speak = showTranslation ? onSpeakTranslation : null;
     final bool hasActions = speak != null || onToggleFavourite != null;
@@ -113,6 +143,13 @@ class AyahView extends StatelessWidget {
             scale: textScale,
             isRightToLeft: translationIsRightToLeft,
           ),
+        if (showTranslation && second != null) ...<Widget>[
+          const SizedBox(height: AppSpacing.lg),
+          _SecondaryTranslationBlock(
+            translation: second,
+            scale: textScale,
+          ),
+        ],
         if (!showArabic && !showTranslation)
           Text(
             'This entry has no text in the selected language.',
@@ -135,6 +172,44 @@ class AyahView extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
           _ReferenceBlock(ayah: ayah),
         ],
+      ],
+    );
+  }
+}
+
+/// The second translation, under the first and named.
+///
+/// Set slightly quieter than the first: the reader chose an order, and two
+/// translations given identical weight leave the eye with nowhere to start.
+class _SecondaryTranslationBlock extends StatelessWidget {
+  const _SecondaryTranslationBlock({
+    required this.translation,
+    required this.scale,
+  });
+
+  final SecondaryTranslation translation;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          translation.title.toUpperCase(),
+          style: AppTypography.overline.copyWith(
+            color: colors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _TranslationText(
+          text: translation.text,
+          scale: scale,
+          isRightToLeft: translation.isRightToLeft,
+          color: colors.textSecondary,
+        ),
       ],
     );
   }
@@ -416,6 +491,7 @@ class _TranslationText extends StatelessWidget {
     required this.text,
     required this.scale,
     required this.isRightToLeft,
+    this.color,
   });
 
   final String text;
@@ -425,6 +501,9 @@ class _TranslationText extends StatelessWidget {
   /// and aligned that way, whatever direction the app itself is running in.
   final bool isRightToLeft;
 
+  /// Overrides the ink. Used to set a second translation back from the first.
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
     final AppColors colors = context.colors;
@@ -432,7 +511,7 @@ class _TranslationText extends StatelessWidget {
       text,
       textAlign: isRightToLeft ? TextAlign.right : TextAlign.start,
       style: AppTypography.translationBody.copyWith(
-        color: colors.textPrimary,
+        color: color ?? colors.textPrimary,
         fontSize: AppTypography.translationBody.fontSize! * scale,
       ),
     );

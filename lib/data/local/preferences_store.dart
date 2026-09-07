@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/entities/enums.dart';
 import '../../domain/entities/notification_preferences.dart';
+import '../../domain/entities/reading_plan.dart';
 import '../../domain/entities/user_preferences.dart';
 import '../../domain/repositories/preferences_repository.dart';
 
@@ -23,11 +24,15 @@ class PreferencesStore implements PreferencesRepository {
   static const String _kReadingOrder = 'pref.reading_order';
   static const String _kOnboardingComplete = 'pref.onboarding_complete';
   static const String _kCurrentEdition = 'pref.current_edition_id';
+  static const String _kSecondaryEdition = 'pref.secondary_edition_id';
+  static const String _kPlanKind = 'plan.kind';
+  static const String _kPlanStartedOn = 'plan.started_on';
 
   static const String _kNotifyEnabled = 'notify.enabled';
   static const String _kNotifyFrequency = 'notify.frequency';
   static const String _kNotifyWeekdays = 'notify.weekdays';
   static const String _kNotifyTime = 'notify.time';
+  static const String _kNotifyContent = 'notify.content';
   static const String _kNotifyTimezone = 'notify.timezone';
   static const String _kNotifyAnchor = 'notify.anchor_date';
 
@@ -41,7 +46,19 @@ class PreferencesStore implements PreferencesRepository {
       textSize: TextSizePreference.fromStorage(_prefs.getString(_kTextSize)),
       readingOrder: ReadingOrder.fromStorage(_prefs.getString(_kReadingOrder)),
       onboardingComplete: _prefs.getBool(_kOnboardingComplete) ?? false,
+      plan: _loadPlan(),
       currentEditionId: _prefs.getString(_kCurrentEdition),
+      secondaryEditionId: _prefs.getString(_kSecondaryEdition),
+    );
+  }
+
+  ReadingPlan _loadPlan() {
+    final int? startedOn = _prefs.getInt(_kPlanStartedOn);
+    return ReadingPlan(
+      kind: ReadingPlanKind.fromStorage(_prefs.getString(_kPlanKind)),
+      startedOn: startedOn == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(startedOn),
     );
   }
 
@@ -54,11 +71,27 @@ class PreferencesStore implements PreferencesRepository {
     await _prefs.setString(_kTextSize, preferences.textSize.storageKey);
     await _prefs.setString(_kReadingOrder, preferences.readingOrder.storageKey);
     await _prefs.setBool(_kOnboardingComplete, preferences.onboardingComplete);
+    await _prefs.setString(_kPlanKind, preferences.plan.kind.storageKey);
+    final DateTime? planStartedOn = preferences.plan.startedOn;
+    if (planStartedOn == null) {
+      await _prefs.remove(_kPlanStartedOn);
+    } else {
+      await _prefs.setInt(
+        _kPlanStartedOn,
+        planStartedOn.millisecondsSinceEpoch,
+      );
+    }
     final String? editionId = preferences.currentEditionId;
     if (editionId == null) {
       await _prefs.remove(_kCurrentEdition);
     } else {
       await _prefs.setString(_kCurrentEdition, editionId);
+    }
+    final String? secondaryId = preferences.secondaryEditionId;
+    if (secondaryId == null) {
+      await _prefs.remove(_kSecondaryEdition);
+    } else {
+      await _prefs.setString(_kSecondaryEdition, secondaryId);
     }
   }
 
@@ -72,6 +105,7 @@ class PreferencesStore implements PreferencesRepository {
           NotificationFrequency.fromStorage(_prefs.getString(_kNotifyFrequency)),
       selectedWeekdays: _parseWeekdays(weekdays),
       time: TimeOfDayValue.parse(_prefs.getString(_kNotifyTime)),
+      content: ReminderContent.fromStorage(_prefs.getString(_kNotifyContent)),
       timezone: _prefs.getString(_kNotifyTimezone),
       anchorDate:
           anchor == null ? null : DateTime.fromMillisecondsSinceEpoch(anchor),
@@ -94,6 +128,7 @@ class PreferencesStore implements PreferencesRepository {
           .toList(growable: false),
     );
     await _prefs.setString(_kNotifyTime, preferences.time.storageValue);
+    await _prefs.setString(_kNotifyContent, preferences.content.storageKey);
     final String? timezone = preferences.timezone;
     if (timezone == null) {
       await _prefs.remove(_kNotifyTimezone);

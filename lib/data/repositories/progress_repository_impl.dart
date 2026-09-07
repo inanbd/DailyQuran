@@ -56,6 +56,10 @@ class ProgressRepositoryImpl implements ProgressRepository {
       _dao.firstUnreadOrdinal(scope, totalAyah);
 
   @override
+  Future<int> readCountSince(String scope, DateTime since) =>
+      _dao.readCountSince(scope, since);
+
+  @override
   Future<ReadingProgress> resetScope(String scope, int totalAyah) =>
       _dao.resetScope(scope, totalAyah);
 }

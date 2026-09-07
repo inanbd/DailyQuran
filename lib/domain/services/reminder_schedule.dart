@@ -82,6 +82,50 @@ class ReminderSchedule {
     return null;
   }
 
+  /// How many reading periods begin in the inclusive calendar range
+  /// [from] – [to].
+  ///
+  /// This is what a reading plan divides by: a plan's portion is what has to be
+  /// read *this period* to hold its date, so a weekly reader working towards
+  /// the same date gets a week's worth at a time rather than a day's.
+  ///
+  /// Settings that can never fire fall back to a daily period, exactly as
+  /// [currentPeriodStart] does, so a plan still works with reminders switched
+  /// off.
+  int periodsBetween(DateTime from, DateTime to) {
+    final int span = _epochDay(to) - _epochDay(from) + 1;
+    if (span <= 0) return 0;
+    // A plan is at most a year long, so the horizon is never actually reached;
+    // clamping only keeps a corrupt start date from spinning here.
+    final int days = span > _searchHorizonDays ? _searchHorizonDays : span;
+
+    int count = 0;
+    for (int offset = 0; offset < days; offset++) {
+      if (occursOn(_addDays(_dateOnly(from), offset))) count++;
+    }
+    return count > 0 ? count : days;
+  }
+
+  /// Roughly how many calendar days one reading period spans.
+  ///
+  /// Exact for daily, every-other-day and weekly; an average for selected days,
+  /// where the gap between periods is not constant. Used only for projecting a
+  /// finish date months out, where "about" is the honest precision anyway —
+  /// never for the portion itself, which [periodsBetween] resolves exactly.
+  double get averageDaysPerPeriod {
+    switch (preferences.frequency) {
+      case NotificationFrequency.daily:
+        return 1;
+      case NotificationFrequency.everyOtherDay:
+        return 2;
+      case NotificationFrequency.weekly:
+        return 7;
+      case NotificationFrequency.selectedDays:
+        final int days = activeWeekdays.length;
+        return days == 0 ? 1 : 7 / days;
+    }
+  }
+
   /// Start of the reading period containing [now].
   ///
   /// Always returns a value: when the reminder settings themselves never fire,

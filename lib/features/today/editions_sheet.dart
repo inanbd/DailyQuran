@@ -138,7 +138,7 @@ class _EditionRowState extends ConsumerState<_EditionRow> {
 
     final List<String> details = <String>[
       if (edition.translator.isNotEmpty) edition.translator,
-      edition.languageName,
+      edition.languageLabel,
     ];
 
     return Semantics(

@@ -120,6 +120,8 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const SizedBox(height: AppSpacing.xl),
+            _ReminderContentGroup(preferences: preferences),
             if (readinessAsync.hasValue && !readiness.isBlocked) ...<Widget>[
               const SizedBox(height: AppSpacing.xl),
               _DeliveryGroup(readiness: readiness),
@@ -177,6 +179,55 @@ class NotificationSettingsScreen extends ConsumerWidget {
       preferences.copyWith(
         time: TimeOfDayValue(picked.hour, picked.minute),
       ),
+    );
+  }
+}
+
+/// How much a reminder is allowed to reveal.
+///
+/// The one setting on this screen that is not about delivery: a notification is
+/// read on a lock screen by whoever is looking at it, and only the reader can
+/// weigh that against the convenience of seeing the ayah without unlocking. So
+/// the app asks, shows each option as the text it would actually produce, and
+/// defaults to revealing nothing.
+class _ReminderContentGroup extends ConsumerWidget {
+  const _ReminderContentGroup({required this.preferences});
+
+  final NotificationPreferences preferences;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        SettingsGroup(
+          title: 'What the reminder says',
+          children: <Widget>[
+            for (final ReminderContent content in ReminderContent.values)
+              ChoiceRow<ReminderContent>(
+                label: SettingsLabels.reminderContentName(content),
+                description: SettingsLabels.reminderContentExample(content),
+                value: content,
+                groupValue: preferences.content,
+                onChanged: (ReminderContent value) => ref
+                    .read(notificationPreferencesProvider.notifier)
+                    .update(preferences.copyWith(content: value)),
+              ),
+          ],
+        ),
+        if (preferences.content.carriesQuranText) ...<Widget>[
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Qur’an text will appear on your lock screen, where anyone holding '
+            'or glancing at your phone can read it. It names the ayah that was '
+            'next when the reminder was last set, so it can be a little behind '
+            'if you read somewhere else in between.',
+            style: AppTypography.reference.copyWith(
+              color: context.colors.textSecondary,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

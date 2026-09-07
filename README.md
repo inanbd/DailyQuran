@@ -3,16 +3,17 @@
 A quiet reading app: one ayah at a time, one gentle reminder, steady progress.
 
 You choose a translation — seven ship with the app, in six languages — choose
-when you want to be reminded, and read the Qur'an through in order. Your place
-is saved and follows you from one translation to another, nothing is marked read
-unless you read it, and the whole reading experience works offline. No account,
-no feed, no streaks.
+when you want to be reminded and how much you want to read, and work through the
+Qur'an in order. Your place is saved and follows you from one translation to
+another, nothing is marked read unless you read it, and the whole reading
+experience works offline. No account, no feed, no streaks.
 
 ---
 
 ## Contents
 
 - [Reading model](#reading-model)
+- [Reading plans](#reading-plans)
 - [Qur'an text and source integrity](#quran-text-and-source-integrity)
 - [Choosing a translation](#choosing-a-translation)
 - [Word-by-word tarjama](#word-by-word-tarjama)
@@ -34,15 +35,21 @@ no feed, no streaks.
 
 The rule the whole app turns on:
 
-> **Stay on what you read this period; otherwise move to the first ayah you
-> have not read.**
+> **Stay on what you read this period once its portion is finished; otherwise
+> move to the first ayah you have not read.**
+
+On the default plan the portion is a single ayah, so it finishes the moment
+anything is read and the rule reads as it always did — read one ayah, and the
+app holds you there for the rest of the day. On a plan asking for eighteen, the
+same sentence carries you through all eighteen and then stops.
 
 That single rule produces the behaviour the product needs:
 
 | Situation | What happens |
 |---|---|
 | First open | The first ayah |
-| Read today, reopen tonight | The same ayah — no jumping ahead |
+| Read today's portion, reopen tonight | The last ayah of it — no jumping ahead |
+| Read part of today's portion | The next ayah of it |
 | Read yesterday, open after the reminder time | The next unread ayah |
 | Missed a fortnight | The first ayah you never read, not the 14th |
 | Skipped ahead to 2:255 and read it | Tomorrow returns to the ayah you skipped |
@@ -59,6 +66,11 @@ reader actually reads:
   5 seconds (`TodayScreen.dwell`), it marks itself. An ayah scrolled past on the
   way to *Next* is not marked, and a reader who marks one back as unread is
   never overruled — auto-marking happens at most once per ayah.
+
+Auto-marking marks but never turns the page, which is what keeps it safe on a
+large portion: a dwell timer that also advanced would walk itself through the
+whole day's reading, five seconds at a time, while the reader sat still.
+Pressing *Mark as read* does advance, because that is a deliberate act.
 
 Moving between ayat is browsing, not reading: the arrows, a horizontal swipe on
 the reading surface, and the surah index all change position without marking
@@ -88,6 +100,61 @@ progress and saved ayat are stored against a **scope** and a **verse key**
 
 This is the one deliberate departure from a shelf-of-separate-books model, and
 it is what makes changing translation cost nothing.
+
+## Reading plans
+
+How much a reading period asks for, under **Settings → Reading plan**:
+
+| Plan | What it works out to |
+|---|---|
+| **One ayah a day** | One ayah a period, no end date. The default. |
+| **Finish in a month** | About 202 ayat a day |
+| **Finish in a year** | About 18 ayat a day |
+
+Both endpoints count as days you can read on, so a month is 31 readings rather
+than 30. The plan screen and the scheduler share that arithmetic
+(`ReadingPlanKind.nominalPerDay`), and a test pins them together — a screen
+advertising 208 a day while the engine asked for 202 would be lying about the
+only number on it.
+
+A plan is either a *rate* or a *date*, and everything else follows from which.
+"One ayah a day" sets a rate and lets the finish date fall where it may; the
+other two commit to a date and let the rate follow from it.
+
+### Portions are per reading period, not per calendar day
+
+A plan divides by the number of times you actually read, not by the number of
+days on the calendar. A weekly reader working towards the same date gets a
+week's worth at a time. That is what `ReminderSchedule.periodsBetween` counts.
+
+### Missing days makes the next portion bigger
+
+Nothing is ever marked read because time passed, so missing a fortnight leaves
+exactly those ayat unread — with fewer periods left to read them in. The portion
+is simply
+
+    what is left ÷ periods left
+
+recomputed every period, so it grows on its own and the date holds. There is no
+backlog written down anywhere, nothing to "clear", and no streak to break.
+
+Two guard rails stop that arithmetic turning cruel:
+
+- **Past the date**, a plan stops demanding everything at once. It falls back to
+  its original steady rate and reports an honest new finish date instead.
+- **The target is computed from the state at the start of the period**, so it
+  cannot recede as you read through it — a portion of four stays a portion of
+  four until it is done.
+
+And because a deadline still needs a way out, **Start this plan from today**
+re-baselines a plan without touching anything you have read. Someone who put the
+app down for two months picks it up again at a sane portion rather than an
+impossible one. Restarting a finished reading re-baselines it automatically.
+
+The arithmetic is pure Dart in
+[`lib/domain/services/plan_scheduler.dart`](lib/domain/services/plan_scheduler.dart)
+and covered directly by
+[`test/domain/plan_scheduler_test.dart`](test/domain/plan_scheduler_test.dart).
 
 ## Qur'an text and source integrity
 
@@ -256,9 +323,10 @@ lib/
                     and system-settings channel
     repositories/   Repository implementations
   domain/
-    entities/     Editions, ayat, surahs, progress, preferences
+    entities/     Editions, ayat, surahs, progress, plans, preferences
     repositories/ Abstract contracts
-    services/     Reminder maths and the reading rule (pure Dart)
+    services/     Reminder maths, the reading rule, plan portions and
+                  reminder text (all pure Dart)
   features/
     onboarding/ library/ progress/ settings/ shell/ splash/
     today/      Reading surface, surah index, translation chooser,
@@ -301,10 +369,18 @@ Some deliberate choices:
   are a value of the ayah — always read with it, never queried independently —
   and a second table would mean 77,000 more rows and a join for nothing.
 - **Scheduling maths is pure Dart.**
-  [`ReminderSchedule`](lib/domain/services/reminder_schedule.dart) and
-  [`ReadingScheduler`](lib/domain/services/reading_scheduler.dart) have no
-  Flutter or platform dependencies, so the tricky parts — weekday cadences,
-  period boundaries, missed days — are tested directly.
+  [`ReminderSchedule`](lib/domain/services/reminder_schedule.dart),
+  [`ReadingScheduler`](lib/domain/services/reading_scheduler.dart) and
+  [`PlanScheduler`](lib/domain/services/plan_scheduler.dart) have no Flutter or
+  platform dependencies, so the tricky parts — weekday cadences, period
+  boundaries, missed days, catch-up portions — are tested directly.
+- **A plan's portion is derived, never stored.** Missed reading is not written
+  down as a backlog to be reconciled; it is what is left divided by the periods
+  left, recomputed each time. There is no second source of truth about progress
+  to drift from the read table.
+- **How much of a portion is done is counted, not tallied.** One `COUNT(*)` over
+  rows read since the period began, so it stays correct however the reader moved
+  about — ahead, back, or into another translation.
 - **Progress is one row per ayah actually read.** Nothing is ever inferred in
   bulk, which is what guarantees skipped ayat stay unread.
 - **The clock is injectable** (`clockProvider`), so "the next morning" is a test
@@ -346,9 +422,43 @@ Some deliberate choices:
   covers timezone changes and frequency edits.
 - **Changing any setting cancels everything and re-arms**, so a stale reminder
   can never survive a frequency change.
-- **The notification never contains Qur'an text**, and never names the
-  translation — only an invitation to open the app. Tapping it deep-links to the
-  reader's current position.
+- **A notification never names the translation**, and tapping it deep-links to
+  the reader's current position — never to an ayah the notification chose.
+
+### What the reminder says
+
+A notification is read on a lock screen by whoever happens to be looking at it.
+That makes "how much should it reveal" a decision only the reader can make, so
+the app asks, under **Settings → Notifications → What the reminder says**:
+
+| Setting | Example |
+|---|---|
+| **Just an invitation** (default) | "Your next ayah is ready." |
+| **Which ayah is next** | "Al-Baqarah 2:255 · 18 ayat" — a citation, no Qur'an text |
+| **The translation** | "Allah — there is no deity except Him…" |
+| **The Arabic** | The ayah's Arabic |
+
+The default reveals nothing, and each step up reveals exactly one more thing.
+Composition lives in
+[`ReminderMessageComposer`](lib/domain/services/reminder_message_composer.dart),
+in the domain layer, so the platform adapter is handed two strings and cannot
+widen what it was given.
+
+Two consequences worth knowing:
+
+- **A setting that cannot be honoured steps down rather than failing.** An
+  edition with no translation installed, or a reminder armed before any edition
+  was chosen, falls back down the ladder — so a reader can be shown less than
+  they asked for, but never a blank notification.
+- **The text is a snapshot, not a subscription.** An OS-level repeating alarm
+  carries fixed text, so a reminder that names an ayah names the one that was
+  next when it was armed. The app therefore re-arms when it is backgrounded and
+  when an edition's text first lands, not only at launch. Reading somewhere else
+  on another device would still leave it a little behind, and the settings
+  screen says so.
+
+Only readers who changed one of these settings pay for any of it: on the default
+plan revealing nothing, the message is a constant and no lookup happens at all.
 
 Android needs core library desugaring for the notification plugin; it is already
 configured in `android/app/build.gradle.kts`, along with ProGuard rules that keep
@@ -367,16 +477,18 @@ flutter analyze     # lib, test and tool must be clean
 flutter test
 ```
 
-161 tests cover the reminder cadences and period boundaries, the reading rule
-(including missed days and skipping ahead), the SQLite progress layer and its
-shared scope, the v1 → v2 migration, JSON parsing and error states, the
-repository install path, the reading surface in each language mode,
-transliteration and right-to-left translations, word-by-word glosses and the
-guarantee that they replace the running Arabic rather than repeat it, switching
-translation without losing your place, reading the translation aloud (and never
-the Arabic), auto-marking and its guard rails, swipe navigation, the surah
-index, notification scheduling and permission handling, and the full first-run
-journey end to end.
+202 tests cover the reminder cadences and period boundaries, the reading rule
+(including missed days, skipping ahead and unfinished portions), reading-plan
+arithmetic (catch-up, reading ahead, a target that cannot recede, and what
+happens once the date has passed), what a reminder is allowed to say and its
+fallbacks, the SQLite progress layer and its shared scope, the v1 → v2
+migration, JSON parsing and error states, the repository install path, the
+reading surface in each language mode, transliteration and right-to-left
+translations, word-by-word glosses and the guarantee that they replace the
+running Arabic rather than repeat it, switching translation without losing your
+place, reading the translation aloud (and never the Arabic), auto-marking and
+its guard rails, swipe navigation, the surah index, notification scheduling and
+permission handling, and the full first-run journey end to end.
 
 `test/features/main_journey_test.dart` runs the exact scenario the product is
 built around: install → Saheeh International → Arabic + translation → daily at
@@ -431,11 +543,16 @@ app is in the foreground and lets taps reach Dart.
 ## Privacy
 
 No account, no analytics, no advertising SDK, no location or contacts access.
-Reading progress, favourites and preferences stay in local storage on the device.
-Every permission the app asks for serves reminders — notifications, exact alarms,
-and an exemption from battery optimisation — and none is requested until the
-reader has chosen a reminder time. Declining any of them costs punctuality,
-nothing else.
+Reading progress, favourites, plans and preferences stay in local storage on the
+device. Every permission the app asks for serves reminders — notifications,
+exact alarms, and an exemption from battery optimisation — and none is requested
+until the reader has chosen a reminder time. Declining any of them costs
+punctuality, nothing else.
+
+The one place the app can put anything where someone other than the reader might
+see it is the lock screen, and it does so only on request: reminders reveal
+nothing by default, and the setting that changes that says plainly what it will
+show and where. See [What the reminder says](#what-the-reminder-says).
 
 ## Licences
 

@@ -11,7 +11,9 @@ import '../features/progress/progress_screen.dart';
 import '../features/settings/about_screen.dart';
 import '../features/settings/appearance_settings_screen.dart';
 import '../features/settings/notification_settings_screen.dart';
+import '../features/settings/reading_plan_screen.dart';
 import '../features/settings/reading_settings_screen.dart';
+import '../features/settings/second_translation_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/splash/splash_screen.dart';
@@ -147,6 +149,16 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                     path: 'reading',
                     builder: (BuildContext context, GoRouterState state) =>
                         const ReadingSettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'second-translation',
+                    builder: (BuildContext context, GoRouterState state) =>
+                        const SecondTranslationScreen(),
+                  ),
+                  GoRoute(
+                    path: 'plan',
+                    builder: (BuildContext context, GoRouterState state) =>
+                        const ReadingPlanScreen(),
                   ),
                   GoRoute(
                     path: 'appearance',

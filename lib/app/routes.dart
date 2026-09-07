@@ -21,6 +21,8 @@ abstract final class Routes {
 
   static const String settingsNotifications = '$settings/notifications';
   static const String settingsReading = '$settings/reading';
+  static const String settingsSecondTranslation = '$settings/second-translation';
+  static const String settingsPlan = '$settings/plan';
   static const String settingsAppearance = '$settings/appearance';
   static const String settingsAbout = '$settings/about';
 

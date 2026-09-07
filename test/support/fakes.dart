@@ -175,6 +175,7 @@ class FakeNotificationScheduler implements NotificationScheduler {
   final List<NotificationPreferences> scheduledPreferences =
       <NotificationPreferences>[];
   final List<String?> scheduledEditionIds = <String?>[];
+  final List<ReminderMessage> scheduledMessages = <ReminderMessage>[];
   final List<ReminderRequirement> requested = <ReminderRequirement>[];
   int cancelAllCalls = 0;
   int settingsOpened = 0;
@@ -215,13 +216,19 @@ class FakeNotificationScheduler implements NotificationScheduler {
     return true;
   }
 
+  /// The text the most recent reminder was armed with.
+  ReminderMessage? get lastMessage =>
+      scheduledMessages.isEmpty ? null : scheduledMessages.last;
+
   @override
   Future<void> reschedule({
     required NotificationPreferences preferences,
     required String? editionId,
+    ReminderMessage message = ReminderMessage.invitation,
   }) async {
     scheduledPreferences.add(preferences);
     scheduledEditionIds.add(editionId);
+    scheduledMessages.add(message);
   }
 
   @override

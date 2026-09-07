@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../app/edition_providers.dart';
-import '../../core/utils/formatting.dart';
 import '../../domain/entities/quran_edition.dart';
-import '../../domain/entities/reading_progress.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import 'progress_bar.dart';
 
-/// An edition as it appears in the library: translation name, translator,
-/// language, size, and progress once started.
+/// An edition as it appears in the library: translation name, translator and
+/// language, and nothing else.
+///
+/// Deliberately says nothing about progress or length. Every complete edition
+/// shares one reading scope, so a progress bar on each card would repeat the
+/// same figure down the whole list, and the ayah count is the same 6,236 on
+/// every one of them. The Progress screen is where the reading is measured.
 class EditionCard extends StatelessWidget {
   const EditionCard({
     required this.entry,
@@ -32,12 +34,10 @@ class EditionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppColors colors = context.colors;
     final QuranEdition edition = entry.edition;
-    final ReadingProgress progress = entry.progress;
-    final bool started = entry.hasStarted;
 
     return Semantics(
       button: true,
-      label: _semanticLabel(edition, progress, started),
+      label: _semanticLabel(edition),
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
@@ -69,19 +69,6 @@ class EditionCard extends StatelessWidget {
                   if (isCurrent) const _CurrentBadge(),
                 ],
               ),
-              if (edition.titleArabic.isNotEmpty) ...<Widget>[
-                const SizedBox(height: AppSpacing.xs),
-                Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: Text(
-                    edition.titleArabic,
-                    locale: const Locale('ar'),
-                    style: AppTypography.arabicTitle.copyWith(
-                      color: colors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
               const SizedBox(height: AppSpacing.sm),
               Text(
                 _subtitle(edition),
@@ -95,15 +82,6 @@ class EditionCard extends StatelessWidget {
               ] else if (!edition.isReadable) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 _Tag(label: 'Dataset not installed', color: colors.textSecondary),
-              ],
-              if (started) ...<Widget>[
-                const SizedBox(height: AppSpacing.lg),
-                ReadingProgressBar(
-                  read: progress.totalRead,
-                  total: progress.totalAyah,
-                  label: '${Formatting.count(progress.totalRead)} read',
-                  showPercentage: true,
-                ),
               ],
               if (action != null) ...<Widget>[
                 const SizedBox(height: AppSpacing.lg),
@@ -119,27 +97,15 @@ class EditionCard extends StatelessWidget {
   static String _subtitle(QuranEdition edition) {
     final List<String> parts = <String>[
       if (edition.translator.isNotEmpty) edition.translator,
-      edition.languageName,
-      '${Formatting.count(edition.totalAyah)} ayat',
+      edition.languageLabel,
     ];
     return parts.join(' · ');
   }
 
-  static String _semanticLabel(
-    QuranEdition edition,
-    ReadingProgress progress,
-    bool started,
-  ) {
+  static String _semanticLabel(QuranEdition edition) {
     final StringBuffer buffer = StringBuffer(edition.titleEnglish);
     if (edition.translator.isNotEmpty) buffer.write(', ${edition.translator}');
-    buffer.write(', ${edition.languageName}');
-    buffer.write(', ${Formatting.count(edition.totalAyah)} ayat');
-    if (started) {
-      buffer.write(
-        ', ${Formatting.count(progress.totalRead)} read, '
-        '${Formatting.percent(progress.percentage)} complete',
-      );
-    }
+    buffer.write(', ${edition.languageLabel}');
     if (edition.isFixture) buffer.write(', development data');
     if (!edition.isReadable) buffer.write(', dataset not installed');
     return buffer.toString();

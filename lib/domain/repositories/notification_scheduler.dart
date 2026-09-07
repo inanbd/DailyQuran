@@ -1,11 +1,13 @@
 import 'package:meta/meta.dart';
 
 import '../entities/notification_preferences.dart';
+import '../entities/reminder_message.dart';
 import '../entities/reminder_readiness.dart';
 
 // `NotificationPermissionStatus` and the requirements it describes are domain
 // values, not implementation details, so they live with the entities. Re-
 // exported here because everything that talks to a scheduler needs them.
+export '../entities/reminder_message.dart';
 export '../entities/reminder_readiness.dart';
 
 /// Where a tapped notification should take the reader.
@@ -27,9 +29,10 @@ class QuranDeepLink {
 
 /// Everything the app needs from the platform's local-notification support.
 ///
-/// Scheduling is deliberately one-way: a reminder can only ever *invite* the
-/// reader to open the app. Firing a notification never changes reading
-/// progress, and a notification never carries Qur'an text.
+/// Scheduling is deliberately one-way: firing a notification never changes
+/// reading progress. What a reminder *says* is not decided here — the message
+/// arrives already composed, so this layer knows nothing about ayat, editions
+/// or plans and cannot leak more than the reader asked it to.
 abstract interface class NotificationScheduler {
   /// Prepares the plugin and timezone database. Safe to call more than once.
   Future<void> initialize();
@@ -57,14 +60,21 @@ abstract interface class NotificationScheduler {
   /// Returns false when the platform could not open it.
   Future<bool> openSystemNotificationSettings();
 
-  /// Cancels everything pending and re-arms from [preferences].
+  /// Cancels everything pending and re-arms from [preferences], showing
+  /// [message].
   ///
   /// Called whenever preferences change and on every app start, which is what
   /// keeps reminders correct across reboots, app updates, DST transitions and
   /// the reader travelling to a new timezone.
+  ///
+  /// [message] is a snapshot, not a subscription: an OS-level repeating alarm
+  /// carries fixed text, so a reminder that names an ayah names the one that
+  /// was next when it was armed. Re-arming after progress changes is what keeps
+  /// that honest, and is why the app re-arms on reading as well as on launch.
   Future<void> reschedule({
     required NotificationPreferences preferences,
     required String? editionId,
+    ReminderMessage message = ReminderMessage.invitation,
   });
 
   Future<void> cancelAll();

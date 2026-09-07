@@ -17,7 +17,7 @@ plugins {
 }
 
 android {
-    namespace = "com.i9tech.dailyquran"
+    namespace = "com.i9tech.qurandaily"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -30,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.i9tech.dailyquran"
+        applicationId = "com.i9tech.qurandaily"
         // flutter_local_notifications requires API 21+; desugaring covers the
         // java.time usage below that.
         minSdk = maxOf(flutter.minSdkVersion, 23)

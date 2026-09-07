@@ -1,4 +1,4 @@
-package com.i9tech.dailyquran
+package com.i9tech.qurandaily
 
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -130,7 +130,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private companion object {
-        const val CHANNEL = "com.i9tech.dailyquran/power"
+        const val CHANNEL = "com.i9tech.qurandaily/power"
 
         /**
          * Distinct from the codes `flutter_local_notifications` uses for its own

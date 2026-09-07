@@ -19,7 +19,7 @@ class DevicePowerSettings {
   const DevicePowerSettings({this._channel = _defaultChannel});
 
   static const MethodChannel _defaultChannel =
-      MethodChannel('com.i9tech.dailyquran/power');
+      MethodChannel('com.i9tech.qurandaily/power');
 
   final MethodChannel _channel;
 

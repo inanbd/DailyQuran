@@ -47,10 +47,22 @@ abstract final class SettingsLabels {
       case ReadingPlanKind.oneAyah:
         return 'One ayah a day';
       case ReadingPlanKind.oneMonth:
-        return 'Finish in a month';
+        return 'In a month';
       case ReadingPlanKind.oneYear:
-        return 'Finish in a year';
+        return 'In a year';
+      case ReadingPlanKind.custom:
+        return 'By a chosen date';
     }
+  }
+
+  /// The plan as a settings-row value — a chosen-date plan is named by its
+  /// date, which is the whole of what the reader chose.
+  static String planValue(ReadingPlan plan) {
+    final DateTime? target = plan.targetDate;
+    if (plan.kind == ReadingPlanKind.custom && target != null) {
+      return 'By ${Formatting.date(target)}';
+    }
+    return planName(plan.kind);
   }
 
   /// What a reminder will say, as the example itself rather than a description

@@ -48,8 +48,8 @@ class SettingsScreen extends ConsumerWidget {
                 onTap: () => context.go(Routes.settingsSecondTranslation),
               ),
               SettingsRow(
-                label: 'Reading plan',
-                value: SettingsLabels.planName(preferences.plan.kind),
+                label: 'Qur’an Planner',
+                value: SettingsLabels.planValue(preferences.plan),
                 onTap: () => context.go(Routes.settingsPlan),
               ),
               SettingsRow(

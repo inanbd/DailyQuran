@@ -16,6 +16,11 @@ class ReminderSchedule {
   /// enough for a weekly cadence, short enough to stay cheap.
   static const int _searchHorizonDays = 400;
 
+  /// How wide a window [periodsBetween] will count across. The planner lets a
+  /// chosen finish date sit up to five years out, and a window it cannot
+  /// count would silently inflate every portion inside it.
+  static const int _planHorizonDays = 1900;
+
   /// Days a reminder can land on, as ISO weekdays (Mon = 1 … Sun = 7).
   Set<int> get activeWeekdays {
     switch (preferences.frequency) {
@@ -95,9 +100,10 @@ class ReminderSchedule {
   int periodsBetween(DateTime from, DateTime to) {
     final int span = _epochDay(to) - _epochDay(from) + 1;
     if (span <= 0) return 0;
-    // A plan is at most a year long, so the horizon is never actually reached;
-    // clamping only keeps a corrupt start date from spinning here.
-    final int days = span > _searchHorizonDays ? _searchHorizonDays : span;
+    // The longest window the planner can set is five years, so the horizon is
+    // never actually reached; clamping only keeps a corrupt start date from
+    // spinning here.
+    final int days = span > _planHorizonDays ? _planHorizonDays : span;
 
     int count = 0;
     for (int offset = 0; offset < days; offset++) {

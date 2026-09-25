@@ -11,7 +11,7 @@ import '../features/progress/progress_screen.dart';
 import '../features/settings/about_screen.dart';
 import '../features/settings/appearance_settings_screen.dart';
 import '../features/settings/notification_settings_screen.dart';
-import '../features/settings/reading_plan_screen.dart';
+import '../features/settings/quran_planner_screen.dart';
 import '../features/settings/reading_settings_screen.dart';
 import '../features/settings/second_translation_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -158,7 +158,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                   GoRoute(
                     path: 'plan',
                     builder: (BuildContext context, GoRouterState state) =>
-                        const ReadingPlanScreen(),
+                        const QuranPlannerScreen(),
                   ),
                   GoRoute(
                     path: 'appearance',

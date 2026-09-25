@@ -27,6 +27,7 @@ class PreferencesStore implements PreferencesRepository {
   static const String _kSecondaryEdition = 'pref.secondary_edition_id';
   static const String _kPlanKind = 'plan.kind';
   static const String _kPlanStartedOn = 'plan.started_on';
+  static const String _kPlanTargetDate = 'plan.target_date';
 
   static const String _kNotifyEnabled = 'notify.enabled';
   static const String _kNotifyFrequency = 'notify.frequency';
@@ -54,11 +55,22 @@ class PreferencesStore implements PreferencesRepository {
 
   ReadingPlan _loadPlan() {
     final int? startedOn = _prefs.getInt(_kPlanStartedOn);
+    final int? targetDate = _prefs.getInt(_kPlanTargetDate);
+    ReadingPlanKind kind =
+        ReadingPlanKind.fromStorage(_prefs.getString(_kPlanKind));
+    // A custom plan is nothing without its date; losing the date falls back to
+    // the default pace rather than to a deadline that cannot be computed.
+    if (kind == ReadingPlanKind.custom && targetDate == null) {
+      kind = ReadingPlanKind.oneAyah;
+    }
     return ReadingPlan(
-      kind: ReadingPlanKind.fromStorage(_prefs.getString(_kPlanKind)),
+      kind: kind,
       startedOn: startedOn == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(startedOn),
+      targetDate: kind == ReadingPlanKind.custom && targetDate != null
+          ? DateTime.fromMillisecondsSinceEpoch(targetDate)
+          : null,
     );
   }
 
@@ -79,6 +91,15 @@ class PreferencesStore implements PreferencesRepository {
       await _prefs.setInt(
         _kPlanStartedOn,
         planStartedOn.millisecondsSinceEpoch,
+      );
+    }
+    final DateTime? planTargetDate = preferences.plan.targetDate;
+    if (planTargetDate == null) {
+      await _prefs.remove(_kPlanTargetDate);
+    } else {
+      await _prefs.setInt(
+        _kPlanTargetDate,
+        planTargetDate.millisecondsSinceEpoch,
       );
     }
     final String? editionId = preferences.currentEditionId;

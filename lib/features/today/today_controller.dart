@@ -7,6 +7,7 @@ import '../../core/errors/app_exception.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/notification_preferences.dart';
 import '../../domain/entities/quran_edition.dart';
+import '../../domain/entities/reading_plan.dart';
 import '../../domain/entities/reading_progress.dart';
 import '../../domain/entities/user_preferences.dart';
 import '../../domain/repositories/progress_repository.dart';
@@ -314,13 +315,31 @@ class TodayController extends AsyncNotifier<TodayState> {
     // fresh reading would inherit a deadline most of which had already gone,
     // and open on an impossible first portion.
     final UserPreferences preferences = ref.read(userPreferencesProvider);
-    if (preferences.plan.isPaced) {
+    final ReadingPlan plan = preferences.plan;
+    if (plan.isPaced) {
+      final DateTime now = ref.read(clockProvider)();
+      ReadingPlan next = plan.copyWith(startedOn: now);
+      // A chosen date that has already gone cannot be finished by. The new
+      // reading keeps the *length* of the journey the reader chose — the one
+      // thing about the old date that can survive it — while a date still
+      // ahead is kept as it stands.
+      final DateTime? target = plan.targetDate;
+      if (plan.kind == ReadingPlanKind.custom &&
+          target != null &&
+          !_dateOnly(target).isAfter(_dateOnly(now))) {
+        final DateTime from = plan.startedOn ?? target;
+        // Counted in UTC days so a DST transition inside the old window can
+        // never shave a day off the new one.
+        final int days = DateTime.utc(target.year, target.month, target.day)
+            .difference(DateTime.utc(from.year, from.month, from.day))
+            .inDays;
+        next = next.copyWith(
+          targetDate:
+              DateTime(now.year, now.month, now.day + (days < 1 ? 30 : days)),
+        );
+      }
       await ref.read(userPreferencesProvider.notifier).update(
-            preferences.copyWith(
-              plan: preferences.plan.copyWith(
-                startedOn: ref.read(clockProvider)(),
-              ),
-            ),
+            preferences.copyWith(plan: next),
           );
     }
 
@@ -334,6 +353,9 @@ class TodayController extends AsyncNotifier<TodayState> {
     ref.invalidate(libraryProvider);
     ref.invalidate(startedReadingsProvider);
   }
+
+  static DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
 }
 
 final AsyncNotifierProvider<TodayController, TodayState> todayControllerProvider =

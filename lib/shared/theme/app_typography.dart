@@ -103,6 +103,18 @@ abstract final class AppTypography {
     height: 1.5,
   );
 
+  /// The large figure on a stat — the planner's "202 a day", the ring's
+  /// percentage. Tabular figures so a changing number does not sway the
+  /// layout around it.
+  static const TextStyle statNumeral = TextStyle(
+    fontFamily: AppFonts.english,
+    fontSize: 26,
+    fontWeight: FontWeight.w600,
+    height: 1.15,
+    letterSpacing: -0.3,
+    fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
+  );
+
   /// "24 of 6,236 read".
   static const TextStyle progressMeta = TextStyle(
     fontFamily: AppFonts.english,

@@ -33,6 +33,7 @@ void main() {
     required ReadingPlanKind kind,
     required int totalRead,
     required DateTime now,
+    DateTime? targetDate,
     int readThisPeriod = 0,
     int totalAyah = 100,
     NotificationPreferences preferences = daily,
@@ -41,6 +42,7 @@ void main() {
       plan: ReadingPlan(
         kind: kind,
         startedOn: kind.isPaced ? start : null,
+        targetDate: targetDate,
       ),
       progress: progress(totalRead: totalRead, totalAyah: totalAyah),
       notificationPreferences: preferences,
@@ -105,26 +107,106 @@ void main() {
   });
 
   test('the rate a plan advertises is the one it goes on to ask for', () {
-    // The plan screen describes each plan with `nominalPerDay`. If that ever
-    // drifts from what the scheduler actually hands the reader, the only number
-    // on that screen becomes a lie — so they are pinned together here.
-    for (final ReadingPlanKind kind in <ReadingPlanKind>[
-      ReadingPlanKind.oneMonth,
-      ReadingPlanKind.oneYear,
+    // The planner screen describes each plan with `nominalPerDay`. If that
+    // ever drifts from what the scheduler actually hands the reader, the only
+    // number on that screen becomes a lie — so they are pinned together here.
+    final DateTime chosen = DateTime(2026, 4, 15);
+    for (final ReadingPlan plan in <ReadingPlan>[
+      ReadingPlan(kind: ReadingPlanKind.oneMonth, startedOn: start),
+      ReadingPlan(kind: ReadingPlanKind.oneYear, startedOn: start),
+      ReadingPlan(
+        kind: ReadingPlanKind.custom,
+        startedOn: start,
+        targetDate: chosen,
+      ),
     ]) {
       final ReadingPortion portion = resolve(
-        kind: kind,
+        kind: plan.kind,
+        targetDate: plan.targetDate,
         totalRead: 0,
         now: DateTime(2026, 1, 1, 9, 0),
         totalAyah: 6236,
       );
 
       expect(
-        kind.nominalPerDay(6236),
+        plan.nominalPerDay(6236, today: DateTime(2026, 1, 1)),
         portion.target,
-        reason: '${kind.storageKey} advertises a rate it does not ask for',
+        reason:
+            '${plan.kind.storageKey} advertises a rate it does not ask for',
       );
     }
+  });
+
+  group('a chosen date', () {
+    test('is the deadline the plan keeps', () {
+      // 100 ayat, 1–31 January inclusive: the same window a month plan sets,
+      // but put there by the reader.
+      final ReadingPortion portion = resolve(
+        kind: ReadingPlanKind.custom,
+        targetDate: DateTime(2026, 1, 31),
+        totalRead: 0,
+        now: DateTime(2026, 1, 1, 9, 0),
+      );
+
+      expect(portion.deadline, DateTime(2026, 1, 31));
+      expect(portion.target, 4);
+      expect(portion.nominal, 4);
+    });
+
+    test('spreads missed days over the days that remain to it', () {
+      final ReadingPortion portion = resolve(
+        kind: ReadingPlanKind.custom,
+        targetDate: DateTime(2026, 1, 31),
+        totalRead: 0,
+        now: DateTime(2026, 1, 11, 9, 0),
+      );
+
+      // 100 still to read across the 21 days from the 11th to the 31st. The
+      // chosen date does not move — that is what catching up buys.
+      expect(portion.target, 5);
+      expect(portion.isCatchingUp, isTrue);
+      expect(portion.deadline, DateTime(2026, 1, 31));
+    });
+
+    test('thins the remaining days when the reader runs ahead', () {
+      final ReadingPortion portion = resolve(
+        kind: ReadingPlanKind.custom,
+        targetDate: DateTime(2026, 1, 31),
+        totalRead: 80,
+        now: DateTime(2026, 1, 11, 9, 0),
+      );
+
+      expect(portion.target, 1);
+      expect(portion.periodsBehind, 0);
+      expect(portion.deadline, DateTime(2026, 1, 31));
+    });
+
+    test('a far-off date asks for a gentle, honest rate', () {
+      // The whole Qur'an by a date two years out: under nine a day.
+      final ReadingPortion portion = resolve(
+        kind: ReadingPlanKind.custom,
+        targetDate: DateTime(2027, 12, 31),
+        totalRead: 0,
+        now: DateTime(2026, 1, 1, 9, 0),
+        totalAyah: 6236,
+      );
+
+      expect(portion.deadline, DateTime(2027, 12, 31));
+      expect(portion.target, 9);
+    });
+
+    test('a custom plan stripped of its date behaves as the default pace', () {
+      // Only corrupt storage can produce this; it must degrade to the rate
+      // plan rather than divide by a date that is not there.
+      final ReadingPortion portion = resolve(
+        kind: ReadingPlanKind.custom,
+        totalRead: 0,
+        now: DateTime(2026, 1, 1, 9, 0),
+      );
+
+      expect(portion.target, 1);
+      expect(portion.deadline, isNull);
+    });
   });
 
   test('a plan chosen this morning is not already behind', () {

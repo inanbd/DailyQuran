@@ -101,25 +101,32 @@ progress and saved ayat are stored against a **scope** and a **verse key**
 This is the one deliberate departure from a shelf-of-separate-books model, and
 it is what makes changing translation cost nothing.
 
-## Reading plans
+## The Qur'an Planner
 
-How much a reading period asks for, under **Settings → Reading plan**:
+How much a reading period asks for, under **Settings → Qur'an Planner**:
 
-| Plan | What it works out to |
+| Pace | What it works out to |
 |---|---|
 | **One ayah a day** | One ayah a period, no end date. The default. |
-| **Finish in a month** | About 202 ayat a day |
-| **Finish in a year** | About 18 ayat a day |
+| **In a month** | About 202 ayat a day |
+| **In a year** | About 18 ayat a day |
+| **By a chosen date** | Whatever your date works out to — picked on a calendar, up to five years out |
 
 Both endpoints count as days you can read on, so a month is 31 readings rather
-than 30. The plan screen and the scheduler share that arithmetic
-(`ReadingPlanKind.nominalPerDay`), and a test pins them together — a screen
+than 30. The planner screen and the scheduler share that arithmetic
+(`ReadingPlan.nominalPerDay`), and a test pins them together — a screen
 advertising 208 a day while the engine asked for 202 would be lying about the
 only number on it.
 
 A plan is either a *rate* or a *date*, and everything else follows from which.
 "One ayah a day" sets a rate and lets the finish date fall where it may; the
-other two commit to a date and let the rate follow from it.
+others commit to a date — a month out, a year out, or wherever you put it —
+and let the rate follow from it.
+
+The planner's hero card keeps the whole journey visible: a ring of how much of
+the Qur'an is read, today's portion, the days remaining, and the day it all
+finishes on, with an honest sentence about whether you are on course, ahead,
+or behind.
 
 ### Portions are per reading period, not per calendar day
 
@@ -146,10 +153,19 @@ Two guard rails stop that arithmetic turning cruel:
   cannot recede as you read through it — a portion of four stays a portion of
   four until it is done.
 
-And because a deadline still needs a way out, **Start this plan from today**
-re-baselines a plan without touching anything you have read. Someone who put the
-app down for two months picks it up again at a sane portion rather than an
-impossible one. Restarting a finished reading re-baselines it automatically.
+And because a deadline still needs a way out, the planner offers two under
+**Begin anew**:
+
+- **Replan from today** re-baselines a plan without touching anything you have
+  read. Someone who put the app down for two months picks it up again at a sane
+  portion rather than an impossible one. A chosen-date plan is asked for its
+  new date, because re-measuring towards the old one is rarely what a fresh
+  start means.
+- **Restart from the beginning** (confirmed first — it cannot be undone) marks
+  every ayah unread and starts the reading and the plan again from the first
+  ayah. Favourites are kept. Restarting a finished reading from the Today
+  screen re-baselines the plan the same way; a chosen date that has already
+  gone is replaced by a new window of the same length.
 
 The arithmetic is pure Dart in
 [`lib/domain/services/plan_scheduler.dart`](lib/domain/services/plan_scheduler.dart)

@@ -111,8 +111,9 @@ abstract final class PlanScheduler {
     // the reader reads.
     final int outstanding = (remaining + readThisPeriod).clamp(1, total);
 
-    final int? durationDays = plan.kind.durationDays;
-    if (durationDays == null) {
+    final DateTime start = _dateOnly(plan.startedOn ?? progress.startedAt ?? now);
+    DateTime? deadline = plan.isPaced ? plan.deadlineFrom(start) : null;
+    if (deadline == null) {
       // A rate, not a date: one ayah a period, for as long as it takes.
       return ReadingPortion(
         target: 1,
@@ -122,10 +123,9 @@ abstract final class PlanScheduler {
         projectedCompletion: _project(schedule, now, remaining, 1),
       );
     }
-
-    final DateTime start = _dateOnly(plan.startedOn ?? progress.startedAt ?? now);
-    final DateTime deadline =
-        DateTime(start.year, start.month, start.day + durationDays);
+    // Only corrupt storage can put the deadline before the start; a one-day
+    // window keeps the arithmetic finite rather than dividing by nothing.
+    if (deadline.isBefore(start)) deadline = start;
 
     // The rate the plan was sold at — total spread evenly over its whole
     // window. Never less than one, so it can always be divided by.

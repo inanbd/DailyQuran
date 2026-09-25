@@ -281,8 +281,8 @@ void main() {
     });
   });
 
-  group('the plan screen', () {
-    testWidgets('says what each plan will actually ask for',
+  group('the planner screen', () {
+    testWidgets('says what each pace will actually ask for',
         (WidgetTester tester) async {
       final TestHarness harness = await TestHarness.create(
         contentSource: hundred(),
@@ -294,13 +294,14 @@ void main() {
 
       // The rate for the edition actually open, not an aspiration — and the
       // same number the portion below will ask for.
-      expect(find.text('About 4 ayat a day.'), findsOneWidget);
+      expect(find.textContaining('about 4 ayat a day'), findsOneWidget);
       // A hundred ayat over a year rounds to one, and says so in the singular.
-      expect(find.text('About 1 ayah a day.'), findsOneWidget);
-      expect(find.text('The steady pace. No end date.'), findsOneWidget);
+      expect(find.textContaining('about 1 ayah a day'), findsOneWidget);
+      expect(find.text('The unhurried pace. No date to keep.'), findsOneWidget);
+      expect(find.text('Finish by a date of your own choosing.'), findsOneWidget);
     });
 
-    testWidgets('choosing a plan takes effect and shows the date it holds',
+    testWidgets('choosing a pace takes effect and shows the date it holds',
         (WidgetTester tester) async {
       final TestHarness harness = await TestHarness.create(
         contentSource: hundred(),
@@ -310,7 +311,7 @@ void main() {
       await harness.pumpApp(tester);
       await harness.goTo(tester, Routes.settingsPlan);
 
-      final Finder choice = find.text('Finish in a month');
+      final Finder choice = find.text('In a month');
       await tester.ensureVisible(choice);
       await tester.pump();
       await tester.tap(choice);
@@ -321,8 +322,71 @@ void main() {
         ReadingPlanKind.oneMonth,
       );
       // Started today, so the date is a month out and it is not behind.
-      expect(find.textContaining('On track for'), findsOneWidget);
-      expect(find.text('Start this plan from today'), findsOneWidget);
+      expect(find.textContaining('On course for'), findsOneWidget);
+      expect(find.text('Replan from today'), findsOneWidget);
+    });
+
+    testWidgets('a chosen date becomes the plan and its deadline',
+        (WidgetTester tester) async {
+      final TestHarness harness = await TestHarness.create(
+        contentSource: hundred(),
+        now: today,
+        initialPreferences: onboarded(),
+      );
+      await harness.pumpApp(tester);
+      await harness.goTo(tester, Routes.settingsPlan);
+
+      final Finder choice = find.text('By a chosen date');
+      await tester.ensureVisible(choice);
+      await tester.pump();
+      await tester.tap(choice);
+      await harness.settle(tester);
+
+      // The calendar opens a month out by default; accepting it as offered.
+      await harness.tapButton(tester, 'Set the date');
+
+      final ReadingPlan plan =
+          harness.container.read(userPreferencesProvider).plan;
+      expect(plan.kind, ReadingPlanKind.custom);
+      expect(plan.targetDate, DateTime(2026, 2, 6));
+      // 100 ayat across Jan 7 – Feb 6 inclusive: 31 days, four a day — the
+      // same arithmetic every dated pace runs on.
+      expect(find.textContaining('On course for Feb 6, 2026'), findsOneWidget);
+      expect(find.textContaining('about 4 ayat a day'), findsWidgets);
+    });
+
+    testWidgets('restarting from the beginning clears the reading and replans',
+        (WidgetTester tester) async {
+      final TestHarness harness = await TestHarness.create(
+        contentSource: hundred(),
+        now: today,
+        initialPreferences: onboarded(plan: ReadingPlanKind.oneMonth),
+      );
+      await harness.pumpApp(tester);
+
+      // A few days of reading, then a gap.
+      for (int i = 0; i < 4; i++) {
+        await harness.tapButton(tester, 'Mark as read');
+      }
+      harness.clock.advanceDays(10);
+      await harness.act(
+        tester,
+        () => harness.container.read(todayControllerProvider.notifier).refresh(),
+      );
+
+      await harness.goTo(tester, Routes.settingsPlan);
+      await harness.tapButton(tester, 'Restart from the beginning');
+      // The restart destroys read state, so it asks first.
+      expect(find.text('Begin the Qur’an anew?'), findsOneWidget);
+      await harness.tapButton(tester, 'Restart');
+
+      // Every ayah unread again, and the plan measured from today: a full
+      // month ahead, so the portion is back to four and nothing is 'behind'.
+      expect(find.textContaining('0 of 100'), findsWidgets);
+      expect(find.textContaining('On course for'), findsOneWidget);
+      final ReadingPlan plan =
+          harness.container.read(userPreferencesProvider).plan;
+      expect(plan.startedOn, harness.clock.now);
     });
   });
 

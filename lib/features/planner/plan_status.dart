@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:meta/meta.dart';
 
 import '../../app/providers.dart';
 import '../../domain/entities/ayah.dart';
@@ -177,9 +177,15 @@ Future<void> carryOverLegacyPlan(Ref ref) async {
     // launch would only fail again.
   }
 
-  await ref.read(userPreferencesProvider.notifier).update(
-        preferences.copyWith(
-          plan: preferences.plan.copyWith(needsTrackSeed: false),
-        ),
-      );
+  try {
+    await ref.read(userPreferencesProvider.notifier).update(
+          preferences.copyWith(
+            plan: preferences.plan.copyWith(needsTrackSeed: false),
+          ),
+        );
+  } on Object catch (error) {
+    // This runs before the app is allowed past its splash screen, so it must
+    // never throw; the carry-over is simply tried again next launch.
+    debugPrint('Daily Quran: could not record the plan carry-over ($error)');
+  }
 }

@@ -2,7 +2,9 @@ import 'package:daily_quran/app/providers.dart';
 import 'package:daily_quran/app/routes.dart';
 import 'package:daily_quran/domain/entities/enums.dart';
 import 'package:daily_quran/domain/entities/reading_plan.dart';
+import 'package:daily_quran/domain/entities/reading_progress.dart';
 import 'package:daily_quran/domain/entities/user_preferences.dart';
+import 'package:daily_quran/domain/repositories/notification_scheduler.dart';
 import 'package:daily_quran/domain/repositories/progress_repository.dart';
 import 'package:daily_quran/features/today/today_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,7 +13,10 @@ import '../support/fakes.dart';
 import '../support/harness.dart';
 
 /// A reading plan on the real Today screen: what it asks for, how the reader
-/// moves through it, and what it does to the reminder.
+/// moves through it, and what it does to the reminders.
+///
+/// A plan reads on its own track, so every count here is the plan's reading,
+/// never the Daily Ayah's.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -48,8 +53,9 @@ void main() {
       );
       await harness.pumpApp(tester);
 
-      // Counting to one every day would be noise, so there is nothing to count.
-      expect(find.textContaining('Today ·'), findsNothing);
+      // No plan: one reading, nothing to count, and nothing to switch to.
+      expect(find.text('Today’s goal'), findsNothing);
+      expect(find.text('My Plan'), findsNothing);
       expect(find.text('Today’s Ayah'), findsOneWidget);
       expect(find.text('0 of 100 read'), findsOneWidget);
     });
@@ -81,9 +87,12 @@ void main() {
       );
       await harness.pumpApp(tester);
 
-      expect(find.text('Today · 0 of 4'), findsOneWidget);
-      // "Today's Ayah" would be a misdescription of a four-ayah portion.
+      expect(find.text('0 of 4 ayat'), findsOneWidget);
+      // "Today's Ayah" would be a misdescription of a four-ayah goal.
       expect(find.text('Today’s Reading'), findsOneWidget);
+      // With a plan there are two readings, and the page offers both.
+      expect(find.text('Daily Ayah'), findsOneWidget);
+      expect(find.text('My Plan'), findsOneWidget);
     });
 
     testWidgets('marking read carries the reader through the portion',
@@ -100,7 +109,7 @@ void main() {
       // Marking inside an unfinished portion brings the next ayah of it, rather
       // than sitting on one the reader has finished with.
       expect(find.text('Translation number 2.'), findsOneWidget);
-      expect(find.text('Today · 1 of 4'), findsOneWidget);
+      expect(find.text('1 of 4 ayat'), findsOneWidget);
     });
 
     testWidgets('stops at the end of the portion instead of running on',
@@ -116,7 +125,7 @@ void main() {
         await harness.tapButton(tester, 'Mark as read');
       }
 
-      expect(find.text('Today’s portion is done'), findsOneWidget);
+      expect(find.text('Today’s goal is done'), findsOneWidget);
       expect(find.text('4 of 100 read'), findsOneWidget);
       // Held on the last ayah of the portion, not advanced into tomorrow's.
       expect(find.text('Translation number 4.'), findsOneWidget);
@@ -131,7 +140,7 @@ void main() {
       );
       await harness.pumpApp(tester);
 
-      expect(find.text('Today · 0 of 4'), findsOneWidget);
+      expect(find.text('0 of 4 ayat'), findsOneWidget);
 
       // Away for a fortnight, having read nothing.
       harness.clock.advanceDays(14);
@@ -142,10 +151,10 @@ void main() {
 
       // 100 still to read across the 17 days left, so six a day — and the
       // fortnight's ayat are still unread, not marked off by the calendar.
-      expect(find.text('Today · 0 of 6'), findsOneWidget);
+      expect(find.text('0 of 6 ayat'), findsOneWidget);
       expect(find.text('0 of 100 read'), findsOneWidget);
       expect(find.text('Translation number 1.'), findsOneWidget);
-      expect(find.textContaining('More than the usual 4'), findsOneWidget);
+      expect(find.textContaining('You missed some reading'), findsOneWidget);
     });
 
     testWidgets('a big day makes every day after it smaller, and says so',
@@ -157,7 +166,7 @@ void main() {
       );
       await harness.pumpApp(tester);
 
-      expect(find.text('Today · 0 of 4'), findsOneWidget);
+      expect(find.text('0 of 4 ayat'), findsOneWidget);
 
       // A long sitting on the first day: 20 ayat against the 4 asked for.
       // Wrapped in `act` because this is real database I/O, which the fake
@@ -167,7 +176,8 @@ void main() {
             harness.container.read(progressRepositoryProvider);
         for (int ordinal = 1; ordinal <= 20; ordinal++) {
           await progress.markRead(
-            'quran',
+            // The plan's own track.
+            'quran#plan',
             '${((ordinal - 1) ~/ 10) + 1}:${((ordinal - 1) % 10) + 1}',
             ordinal,
             100,
@@ -188,12 +198,12 @@ void main() {
       // 80 left across the 30 days from the 8th to the 6th of February, so the
       // plan asks for three instead of four — the surplus is spread over every
       // day that remains rather than buying a single day off.
-      expect(find.text('Today · 0 of 3'), findsOneWidget);
+      expect(find.text('0 of 3 ayat'), findsOneWidget);
       expect(find.text('20 of 100 read'), findsOneWidget);
       // A number that quietly dropped below the advertised rate reads as a
       // fault unless the reading that earned it is named.
-      expect(find.textContaining('Fewer than the usual 4'), findsOneWidget);
-      expect(find.textContaining('More than the usual'), findsNothing);
+      expect(find.textContaining('You read extra before'), findsOneWidget);
+      expect(find.textContaining('You missed some reading'), findsNothing);
     });
   });
 
@@ -211,7 +221,7 @@ void main() {
       expect(scheduler.lastMessage?.body, 'Your next ayah is ready.');
     });
 
-    testWidgets('counts out the portion once a plan asks for one',
+    testWidgets('a plan brings its own reminder, with the day’s goal',
         (WidgetTester tester) async {
       final FakeNotificationScheduler scheduler = FakeNotificationScheduler();
       final TestHarness harness = await TestHarness.create(
@@ -222,9 +232,18 @@ void main() {
       );
       await harness.pumpApp(tester);
 
-      expect(scheduler.lastMessage?.body, 'Your 4 ayat are ready.');
+      // The Daily Ayah's reminder is about the Daily Ayah alone.
+      expect(scheduler.lastMessage?.body, 'Your next ayah is ready.');
+
+      // The plan's own come a day at a time, from tomorrow: at 9:00 today's
+      // 7:00 reminder has already gone.
+      final List<PlanReminder> plan = scheduler.lastPlanReminders;
+      expect(plan, isNotEmpty);
+      expect(plan.first.at, DateTime(2026, 1, 8, 7, 0));
+      expect(plan.first.message.title, 'Today’s Qur’an goal');
+      expect(plan.first.message.body, '4 ayat to read today. Tap to begin.');
       // Still no Qur'an text: the reader did not ask for any.
-      expect(scheduler.lastMessage?.body, isNot(contains('Translation')));
+      expect(plan.first.message.body, isNot(contains('Translation')));
     });
 
     testWidgets('names the ayah when the reader asks it to',
@@ -282,7 +301,7 @@ void main() {
   });
 
   group('the planner screen', () {
-    testWidgets('says what each pace will actually ask for',
+    testWidgets('says what each plan will actually ask for',
         (WidgetTester tester) async {
       final TestHarness harness = await TestHarness.create(
         contentSource: hundred(),
@@ -290,18 +309,17 @@ void main() {
         initialPreferences: onboarded(),
       );
       await harness.pumpApp(tester);
-      await harness.goTo(tester, Routes.settingsPlan);
+      await harness.goTo(tester, Routes.planner);
 
-      // The rate for the edition actually open, not an aspiration — and the
-      // same number the portion below will ask for.
-      expect(find.textContaining('about 4 ayat a day'), findsOneWidget);
+      // The goal for the edition actually open, not an aspiration — and the
+      // same number the plan will go on to ask for.
+      expect(find.textContaining('About 4 ayat a day'), findsOneWidget);
       // A hundred ayat over a year rounds to one, and says so in the singular.
-      expect(find.textContaining('about 1 ayah a day'), findsOneWidget);
-      expect(find.text('The unhurried pace. No date to keep.'), findsOneWidget);
-      expect(find.text('Finish by a date of your own choosing.'), findsOneWidget);
+      expect(find.textContaining('About 1 ayah a day'), findsOneWidget);
+      expect(find.text('Choose the day you want to finish.'), findsOneWidget);
     });
 
-    testWidgets('choosing a pace takes effect and shows the date it holds',
+    testWidgets('choosing a plan starts it and shows today’s goal',
         (WidgetTester tester) async {
       final TestHarness harness = await TestHarness.create(
         contentSource: hundred(),
@@ -309,9 +327,9 @@ void main() {
         initialPreferences: onboarded(),
       );
       await harness.pumpApp(tester);
-      await harness.goTo(tester, Routes.settingsPlan);
+      await harness.goTo(tester, Routes.planner);
 
-      final Finder choice = find.text('In a month');
+      final Finder choice = find.text('Finish in 1 month');
       await tester.ensureVisible(choice);
       await tester.pump();
       await tester.tap(choice);
@@ -321,9 +339,10 @@ void main() {
         harness.container.read(userPreferencesProvider).plan.kind,
         ReadingPlanKind.oneMonth,
       );
-      // Started today, so the date is a month out and it is not behind.
-      expect(find.textContaining('On course for'), findsOneWidget);
-      expect(find.text('Replan from today'), findsOneWidget);
+      // Started today, so it is on track, and the way in is right there.
+      expect(find.text('You are on track.'), findsOneWidget);
+      expect(find.text('Continue reading'), findsOneWidget);
+      expect(find.text('Plan again from today'), findsOneWidget);
     });
 
     testWidgets('a chosen date becomes the plan and its deadline',
@@ -334,9 +353,9 @@ void main() {
         initialPreferences: onboarded(),
       );
       await harness.pumpApp(tester);
-      await harness.goTo(tester, Routes.settingsPlan);
+      await harness.goTo(tester, Routes.planner);
 
-      final Finder choice = find.text('By a chosen date');
+      final Finder choice = find.text('Pick a finish date');
       await tester.ensureVisible(choice);
       await tester.pump();
       await tester.tap(choice);
@@ -350,12 +369,38 @@ void main() {
       expect(plan.kind, ReadingPlanKind.custom);
       expect(plan.targetDate, DateTime(2026, 2, 6));
       // 100 ayat across Jan 7 – Feb 6 inclusive: 31 days, four a day — the
-      // same arithmetic every dated pace runs on.
-      expect(find.textContaining('On course for Feb 6, 2026'), findsOneWidget);
-      expect(find.textContaining('about 4 ayat a day'), findsWidgets);
+      // same arithmetic every dated plan runs on.
+      // A month from today falls on the same day, so both plans say it.
+      expect(
+        find.text('Finish by Feb 6, 2026\nAbout 4 ayat a day'),
+        findsNWidgets(2),
+      );
+      // And the plan's own finish date, without a year it shares with today.
+      expect(find.text('Feb 6'), findsOneWidget);
     });
 
-    testWidgets('restarting from the beginning clears the reading and replans',
+    testWidgets('continue reading opens the plan’s reading',
+        (WidgetTester tester) async {
+      final TestHarness harness = await TestHarness.create(
+        contentSource: hundred(),
+        now: today,
+        initialPreferences: <String, Object>{
+          ...onboarded(plan: ReadingPlanKind.oneMonth),
+          // Last seen on the Daily Ayah.
+          'flutter.pref.reading_track': 'daily',
+        },
+      );
+      await harness.pumpApp(tester);
+      expect(find.text('Today’s Ayah'), findsOneWidget);
+
+      await harness.goTo(tester, Routes.planner);
+      await harness.tapButton(tester, 'Continue reading');
+
+      expect(find.text('Today’s Reading'), findsOneWidget);
+      expect(find.text('0 of 4 ayat'), findsOneWidget);
+    });
+
+    testWidgets('starting over clears the plan’s reading, not the Daily Ayah’s',
         (WidgetTester tester) async {
       final TestHarness harness = await TestHarness.create(
         contentSource: hundred(),
@@ -364,29 +409,72 @@ void main() {
       );
       await harness.pumpApp(tester);
 
-      // A few days of reading, then a gap.
+      // A day of the plan, and the Daily Ayah read too.
       for (int i = 0; i < 4; i++) {
         await harness.tapButton(tester, 'Mark as read');
       }
+      await harness.act(
+        tester,
+        () => harness.container
+            .read(todayControllerProvider.notifier)
+            .markReadFromNotification(),
+      );
       harness.clock.advanceDays(10);
       await harness.act(
         tester,
         () => harness.container.read(todayControllerProvider.notifier).refresh(),
       );
 
-      await harness.goTo(tester, Routes.settingsPlan);
-      await harness.tapButton(tester, 'Restart from the beginning');
-      // The restart destroys read state, so it asks first.
-      expect(find.text('Begin the Qur’an anew?'), findsOneWidget);
-      await harness.tapButton(tester, 'Restart');
+      await harness.goTo(tester, Routes.planner);
+      await harness.tapButton(tester, 'Start from the first ayah');
+      // Starting over destroys read state, so it asks first.
+      expect(find.text('Start from the first ayah?'), findsOneWidget);
+      await harness.tapButton(tester, 'Start over');
 
-      // Every ayah unread again, and the plan measured from today: a full
-      // month ahead, so the portion is back to four and nothing is 'behind'.
-      expect(find.textContaining('0 of 100'), findsWidgets);
-      expect(find.textContaining('On course for'), findsOneWidget);
-      final ReadingPlan plan =
-          harness.container.read(userPreferencesProvider).plan;
-      expect(plan.startedOn, harness.clock.now);
+      final ProgressRepository progress =
+          harness.container.read(progressRepositoryProvider);
+      final ReadingProgress? plan = await tester
+          .runAsync(() => progress.progressFor('quran#plan', 100));
+      final ReadingProgress? daily =
+          await tester.runAsync(() => progress.progressFor('quran', 100));
+      expect(plan!.totalRead, 0);
+      expect(daily!.totalRead, 1);
+
+      // Measured from today: a full month ahead, so it is on track again.
+      expect(find.text('You are on track.'), findsOneWidget);
+      expect(
+        harness.container.read(userPreferencesProvider).plan.startedOn,
+        harness.clock.now,
+      );
+    });
+
+    testWidgets('stopping the plan turns it off and keeps the Daily Ayah',
+        (WidgetTester tester) async {
+      final TestHarness harness = await TestHarness.create(
+        contentSource: hundred(),
+        now: today,
+        initialPreferences: onboarded(plan: ReadingPlanKind.oneMonth),
+      );
+      await harness.pumpApp(tester);
+      await harness.tapButton(tester, 'Mark as read');
+
+      await harness.goTo(tester, Routes.planner);
+      await harness.tapButton(tester, 'Stop my plan');
+      expect(find.text('Stop your plan?'), findsOneWidget);
+      await harness.tapButton(tester, 'Stop plan');
+
+      expect(
+        harness.container.read(userPreferencesProvider).plan.isPaced,
+        isFalse,
+      );
+      // Back to choosing, with nothing of the old plan left over.
+      expect(find.text('Choose the day you want to finish.'), findsOneWidget);
+      final ReadingProgress? plan = await tester.runAsync(
+        () => harness.container
+            .read(progressRepositoryProvider)
+            .progressFor('quran#plan', 100),
+      );
+      expect(plan!.totalRead, 0);
     });
   });
 
@@ -402,7 +490,7 @@ void main() {
       );
       await harness.pumpApp(tester);
 
-      expect(find.textContaining('Today ·'), findsNothing);
+      expect(find.textContaining('of 4 ayat'), findsNothing);
 
       await harness.act(tester, () async {
         final UserPreferences preferences =
@@ -420,8 +508,11 @@ void main() {
             .applyToScheduler();
       });
 
-      expect(find.text('Today · 0 of 4'), findsOneWidget);
-      expect(scheduler.lastMessage?.body, 'Your 4 ayat are ready.');
+      expect(find.text('0 of 4 ayat'), findsOneWidget);
+      expect(
+        scheduler.lastPlanReminders.first.message.body,
+        '4 ayat to read today. Tap to begin.',
+      );
     });
 
     testWidgets('survives a restart of the app', (WidgetTester tester) async {
@@ -438,7 +529,7 @@ void main() {
         harness.container.read(userPreferencesProvider).plan.kind,
         ReadingPlanKind.oneYear,
       );
-      expect(find.textContaining('Today ·'), findsNothing);
+      expect(find.text('0 of 1 ayah'), findsOneWidget);
     });
   });
 }

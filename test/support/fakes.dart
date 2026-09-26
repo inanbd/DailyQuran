@@ -176,6 +176,16 @@ class FakeNotificationScheduler implements NotificationScheduler {
       <NotificationPreferences>[];
   final List<String?> scheduledEditionIds = <String?>[];
   final List<ReminderMessage> scheduledMessages = <ReminderMessage>[];
+
+  /// The plan reminders each reschedule armed, most recent last.
+  final List<List<PlanReminder>> scheduledPlanReminders =
+      <List<PlanReminder>>[];
+
+  final StreamController<QuranDeepLink> _taps =
+      StreamController<QuranDeepLink>.broadcast();
+
+  /// Delivers [link] as a notification tapped while the app is running.
+  void tap(QuranDeepLink link) => _taps.add(link);
   final List<ReminderRequirement> requested = <ReminderRequirement>[];
   int cancelAllCalls = 0;
   int settingsOpened = 0;
@@ -220,15 +230,22 @@ class FakeNotificationScheduler implements NotificationScheduler {
   ReminderMessage? get lastMessage =>
       scheduledMessages.isEmpty ? null : scheduledMessages.last;
 
+  /// The plan reminders the most recent reschedule armed.
+  List<PlanReminder> get lastPlanReminders => scheduledPlanReminders.isEmpty
+      ? const <PlanReminder>[]
+      : scheduledPlanReminders.last;
+
   @override
   Future<void> reschedule({
     required NotificationPreferences preferences,
     required String? editionId,
     ReminderMessage message = ReminderMessage.invitation,
+    List<PlanReminder> planReminders = const <PlanReminder>[],
   }) async {
     scheduledPreferences.add(preferences);
     scheduledEditionIds.add(editionId);
     scheduledMessages.add(message);
+    scheduledPlanReminders.add(planReminders);
   }
 
   @override
@@ -242,7 +259,7 @@ class FakeNotificationScheduler implements NotificationScheduler {
   }
 
   @override
-  Stream<QuranDeepLink> get deepLinks => const Stream<QuranDeepLink>.empty();
+  Stream<QuranDeepLink> get deepLinks => _taps.stream;
 
   @override
   Future<int> pendingCount() async => scheduledPreferences.length;

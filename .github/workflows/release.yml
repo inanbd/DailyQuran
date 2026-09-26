@@ -1,0 +1,124 @@
+# Builds the Android APK and publishes it as a GitHub Release.
+#
+# Runs when a version tag is pushed (git tag v1.2.0 && git push origin v1.2.0),
+# or by hand from the Actions tab with the tag to publish.
+#
+# Signing: with the four ANDROID_* secrets set (see README, "Releasing"), the
+# APK is signed with the app's own release key and installs over any earlier
+# release signed the same way. Without them it is signed with a throwaway
+# debug key, and the release notes say so.
+name: Release APK
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. v1.2.1'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.5'
+          cache: true
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Set up release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "SIGNING=debug" >> "$GITHUB_ENV"
+            echo "::warning::No signing secrets are set, so this APK is signed with a temporary debug key."
+            exit 0
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
+          {
+            echo "storeFile=release.jks"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+          } > android/key.properties
+          echo "SIGNING=release" >> "$GITHUB_ENV"
+
+      - name: Fit Gradle to the runner
+        # The checked-in heap size suits a developer machine, not a CI runner.
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties
+          echo "kotlin.daemon.jvmargs=-Xmx2g" >> android/gradle.properties
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Name the APK
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/DailyQuran-$TAG.apk"
+          (cd dist && sha256sum "DailyQuran-$TAG.apk" > "DailyQuran-$TAG.apk.sha256")
+
+      - name: Write release notes
+        run: |
+          VERSION="${TAG#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ ("^## " ver "([^0-9.]|$)") { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "## Install"
+            echo
+            echo "Download **DailyQuran-$TAG.apk** below on your Android phone and open it. If Android asks, allow installing apps from this source."
+            echo
+            if [ "$SIGNING" = "debug" ]; then
+              echo "> **Signed with a temporary key.** If you already have Daily Quran installed from another build, Android will refuse to install over it: uninstall the old app first (this clears its reading progress). Releases signed with the app's own key can be installed over each other."
+            else
+              echo "Signed with the app's release key, so it installs over earlier releases signed the same way."
+            fi
+          } >> notes.md
+          cat notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Daily Quran ${{ env.TAG }}
+          body_path: notes.md
+          files: |
+            dist/DailyQuran-${{ env.TAG }}.apk
+            dist/DailyQuran-${{ env.TAG }}.apk.sha256
+          make_latest: true

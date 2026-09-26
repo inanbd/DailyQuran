@@ -7,11 +7,12 @@ import '../features/favourites/favourites_screen.dart';
 import '../features/library/edition_details_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
+import '../features/planner/plan_goal_screen.dart';
+import '../features/planner/planner_screen.dart';
 import '../features/progress/progress_screen.dart';
 import '../features/settings/about_screen.dart';
 import '../features/settings/appearance_settings_screen.dart';
 import '../features/settings/notification_settings_screen.dart';
-import '../features/settings/quran_planner_screen.dart';
 import '../features/settings/reading_settings_screen.dart';
 import '../features/settings/second_translation_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -80,6 +81,11 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (BuildContext context, GoRouterState state) =>
             const OnboardingScreen(),
       ),
+      GoRoute(
+        path: Routes.planGoal,
+        builder: (BuildContext context, GoRouterState state) =>
+            const PlanGoalScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (
           BuildContext context,
@@ -130,6 +136,13 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                 path: Routes.progress,
                 builder: (BuildContext context, GoRouterState state) =>
                     const ProgressScreen(),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'plan',
+                    builder: (BuildContext context, GoRouterState state) =>
+                        const PlannerScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -154,11 +167,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                     path: 'second-translation',
                     builder: (BuildContext context, GoRouterState state) =>
                         const SecondTranslationScreen(),
-                  ),
-                  GoRoute(
-                    path: 'plan',
-                    builder: (BuildContext context, GoRouterState state) =>
-                        const QuranPlannerScreen(),
                   ),
                   GoRoute(
                     path: 'appearance',

@@ -176,6 +176,32 @@ class ProgressDao {
     return _read(db, scope, totalAyah);
   }
 
+  /// Copies every read ayah and the position of [from] into [to], leaving
+  /// anything [to] already holds in place.
+  ///
+  /// How a plan saved before plans had their own track keeps its progress: the
+  /// reading it was measured against is carried over once, so the upgrade
+  /// neither sets the plan back to its first ayah nor touches the original.
+  Future<void> copyScope(String from, String to) async {
+    final Database db = await _database.database;
+    await db.transaction((Transaction txn) async {
+      await txn.rawInsert(
+        'INSERT OR IGNORE INTO ${AppDatabase.readTable} '
+        '(scope, verse_key, ordinal, read_at) '
+        'SELECT ?, verse_key, ordinal, read_at FROM ${AppDatabase.readTable} '
+        'WHERE scope = ?',
+        <Object?>[to, from],
+      );
+      await txn.rawInsert(
+        'INSERT OR IGNORE INTO ${AppDatabase.progressTable} '
+        '(scope, current_ordinal, started_at, last_read_at, completed_at) '
+        'SELECT ?, current_ordinal, started_at, last_read_at, completed_at '
+        'FROM ${AppDatabase.progressTable} WHERE scope = ?',
+        <Object?>[to, from],
+      );
+    });
+  }
+
   static Future<int?> _firstUnread(
     DatabaseExecutor db,
     String scope,

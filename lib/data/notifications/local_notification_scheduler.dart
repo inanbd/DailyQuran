@@ -63,6 +63,13 @@ class LocalNotificationScheduler implements NotificationScheduler {
   static const String channelDescription =
       'A gentle prompt when your next ayah is ready to read.';
 
+  /// A plan's reminders have a channel of their own, so a reader can quiet one
+  /// in system settings without losing the other.
+  static const String planChannelId = 'daily_quran_plan';
+  static const String planChannelName = 'Plan reminders';
+  static const String planChannelDescription =
+      'Your reading plan’s goal for the day.';
+
   /// Id of the single repeating daily reminder.
   static const int _dailyId = 1000;
 
@@ -75,6 +82,9 @@ class LocalNotificationScheduler implements NotificationScheduler {
   /// How many every-other-day occurrences to keep armed — roughly two months,
   /// re-armed whenever the app runs.
   static const int _intervalWindow = 30;
+
+  /// A plan's day-by-day reminders occupy 2000 upwards.
+  static const int _planIdBase = 2000;
 
   /// Body length past which a notification is made expandable rather than
   /// truncated. Comfortably longer than any invitation or citation, so only the
@@ -112,6 +122,14 @@ class LocalNotificationScheduler implements NotificationScheduler {
         channelId,
         channelName,
         description: channelDescription,
+        importance: Importance.defaultImportance,
+      ),
+    );
+    await _android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        planChannelId,
+        planChannelName,
+        description: planChannelDescription,
         importance: Importance.defaultImportance,
       ),
     );
@@ -243,6 +261,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
     required NotificationPreferences preferences,
     required String? editionId,
     ReminderMessage message = ReminderMessage.invitation,
+    List<PlanReminder> planReminders = const <PlanReminder>[],
   }) async {
     await initialize();
     // Re-resolve the device zone: this is the moment a timezone change or a
@@ -253,7 +272,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
     // stale reminder armed.
     await _plugin.cancelAll();
 
-    if (!preferences.enabled) return;
+    if (!preferences.enabled && planReminders.isEmpty) return;
 
     final ReminderReadiness current = await readiness();
     if (current.isBlocked) return;
@@ -272,9 +291,13 @@ class LocalNotificationScheduler implements NotificationScheduler {
     final String title = message.title;
     final String body = message.body;
     final String payload = jsonEncode(<String, Object?>{
-      'type': 'reminder',
+      'type': _dailyType,
       'editionId': editionId,
     });
+
+    await _schedulePlan(planReminders, editionId: editionId, mode: mode);
+
+    if (!preferences.enabled) return;
 
     switch (preferences.frequency) {
       case NotificationFrequency.daily:
@@ -320,6 +343,38 @@ class LocalNotificationScheduler implements NotificationScheduler {
     }
   }
 
+  /// Arms a plan's reminders, one concrete day each.
+  ///
+  /// Never repeating: each carries the goal as it will stand on its own day,
+  /// and the next launch re-arms the lot from the reading as it then stands.
+  Future<void> _schedulePlan(
+    List<PlanReminder> reminders, {
+    required String? editionId,
+    required AndroidScheduleMode mode,
+  }) async {
+    if (reminders.isEmpty) return;
+    final String payload = jsonEncode(<String, Object?>{
+      'type': _planType,
+      'editionId': editionId,
+    });
+    final DateTime now = DateTime.now();
+    for (int index = 0; index < reminders.length; index++) {
+      final PlanReminder reminder = reminders[index];
+      // Composed a moment ago; a reminder due in that moment has already gone.
+      if (!reminder.at.isAfter(now)) continue;
+      await _scheduleRepeating(
+        id: _planIdBase + index,
+        first: _toTz(reminder.at),
+        match: null,
+        mode: mode,
+        title: reminder.message.title,
+        body: reminder.message.body,
+        payload: payload,
+        forPlan: true,
+      );
+    }
+  }
+
   Future<void> _scheduleRepeating({
     required int id,
     required tz.TZDateTime first,
@@ -328,6 +383,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
     required String title,
     required String body,
     required String payload,
+    bool forPlan = false,
   }) async {
     try {
       await _plugin.zonedSchedule(
@@ -337,9 +393,10 @@ class LocalNotificationScheduler implements NotificationScheduler {
         first,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            channelId,
-            channelName,
-            channelDescription: channelDescription,
+            forPlan ? planChannelId : channelId,
+            forPlan ? planChannelName : channelName,
+            channelDescription:
+                forPlan ? planChannelDescription : channelDescription,
             importance: Importance.defaultImportance,
             priority: Priority.defaultPriority,
             // A one-line body is left as one line. A reader who asked for the
@@ -383,6 +440,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
         title: title,
         body: body,
         payload: payload,
+        forPlan: forPlan,
       );
     }
   }
@@ -406,6 +464,9 @@ class LocalNotificationScheduler implements NotificationScheduler {
     return pending.length;
   }
 
+  static const String _dailyType = 'reminder';
+  static const String _planType = 'plan';
+
   static QuranDeepLink? _parsePayload(String? payload) {
     if (payload == null || payload.isEmpty) return null;
     try {
@@ -413,7 +474,14 @@ class LocalNotificationScheduler implements NotificationScheduler {
       if (decoded is! Map<String, Object?>) return null;
       final Object? editionId = decoded['editionId'];
       if (editionId is! String || editionId.isEmpty) return null;
-      return QuranDeepLink(editionId: editionId);
+      return QuranDeepLink(
+        editionId: editionId,
+        // Anything not recognisably a plan's is treated as the Daily Ayah's,
+        // which is what every reminder armed before plans existed was.
+        kind: decoded['type'] == _planType
+            ? ReminderKind.plan
+            : ReminderKind.daily,
+      );
     } on FormatException {
       return null;
     }

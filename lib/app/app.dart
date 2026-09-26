@@ -146,17 +146,30 @@ class _DailyQuranAppState extends ConsumerState<DailyQuranApp>
     );
   }
 
-  /// Opens the reminder's edition at the reader's current position, and marks
-  /// that ayah read.
+  /// Follows a tapped reminder.
   ///
-  /// The notification firing changed nothing; arriving here — the reader
-  /// actually opening it — is what counts as reading it.
+  /// The Daily Ayah's reminder opens the ayah and marks it read: the
+  /// notification firing changed nothing, but the reader actually opening it
+  /// is what counts as reading it.
+  ///
+  /// A plan's reminder opens the day's goal instead, and marks nothing. A
+  /// goal of two hundred ayat is not read by tapping a notification — the
+  /// reader sees what the day asks, and begins when they choose to.
   Future<void> _openFromReminder(QuranDeepLink link) async {
     final String? currentId = ref.read(userPreferencesProvider).currentEditionId;
     if (link.editionId != currentId) {
       await ref
           .read(userPreferencesProvider.notifier)
           .setCurrentEdition(link.editionId);
+    }
+
+    if (link.kind == ReminderKind.plan) {
+      // A plan stopped since the reminder was armed has no goal to show.
+      final bool hasPlan = ref.read(userPreferencesProvider).plan.isPaced;
+      ref.read(routerProvider).go(hasPlan ? Routes.planGoal : Routes.today);
+      // The day may have turned since the goal was last worked out.
+      await ref.read(todayControllerProvider.notifier).refresh();
+      return;
     }
 
     ref.read(routerProvider).go(Routes.today);

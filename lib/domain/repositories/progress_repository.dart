@@ -48,4 +48,8 @@ abstract interface class ProgressRepository {
 
   /// Clears all read state for a scope so it can be read again.
   Future<ReadingProgress> resetScope(String scope, int totalAyah);
+
+  /// Copies [from]'s read state and position into [to], keeping anything [to]
+  /// already has.
+  Future<void> copyScope(String from, String to);
 }

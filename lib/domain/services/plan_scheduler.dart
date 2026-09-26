@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import '../entities/enums.dart';
 import '../entities/notification_preferences.dart';
 import '../entities/reading_plan.dart';
 import '../entities/reading_progress.dart';
@@ -13,6 +14,7 @@ class ReadingPortion {
     required this.read,
     required this.nominal,
     required this.periodsBehind,
+    this.ayatAhead = 0,
     this.deadline,
     this.projectedCompletion,
   });
@@ -44,6 +46,10 @@ class ReadingPortion {
   /// ahead of schedule.
   final int periodsBehind;
 
+  /// Ayat read beyond what the plan's steady rate expected before this
+  /// period began. Zero when on or behind schedule.
+  final int ayatAhead;
+
   /// The date the plan is working towards, or null when it sets a rate instead.
   final DateTime? deadline;
 
@@ -74,7 +80,13 @@ class ReadingPortion {
   /// The mirror of [isCatchingUp], and told for the same reason: a number that
   /// quietly drops from 202 to 188 looks like a fault unless the reading that
   /// earned it is named.
-  bool get isAhead => nominal > 0 && target > 0 && target < nominal;
+  ///
+  /// Only real extra reading counts. The steady rate is rounded up — 201.2 a
+  /// day is asked for as 202 — so a reader exactly on pace is later asked for
+  /// a little under it, and must not be congratulated for reading they did
+  /// not do.
+  bool get isAhead =>
+      nominal > 0 && target > 0 && target < nominal && ayatAhead > 0;
 }
 
 /// Turns a [ReadingPlan] into this period's portion.
@@ -91,6 +103,20 @@ class ReadingPortion {
 ///  * The target is computed from the state at the *start* of the period, so it
 ///    does not shrink as the reader works through it and can never recede.
 abstract final class PlanScheduler {
+  /// The reading periods a plan counts in: calendar days, midnight to
+  /// midnight.
+  ///
+  /// A plan reads on its own track with a goal for each day, so its day is the
+  /// one on the calendar rather than whatever cadence the Daily Ayah's
+  /// reminder keeps. Expressed as a schedule so [resolve] and the reading rule
+  /// can use it unchanged.
+  static const NotificationPreferences calendarDays = NotificationPreferences(
+    enabled: true,
+    frequency: NotificationFrequency.daily,
+    selectedWeekdays: <int>{1, 2, 3, 4, 5, 6, 7},
+    time: TimeOfDayValue(0, 0),
+  );
+
   static ReadingPortion resolve({
     required ReadingPlan plan,
     required ReadingProgress progress,
@@ -158,6 +184,14 @@ abstract final class PlanScheduler {
         total: total,
         nominal: nominal,
       ),
+      ayatAhead: _ayatAhead(
+        schedule: schedule,
+        start: start,
+        now: now,
+        readBefore: progress.totalRead - readThisPeriod,
+        total: total,
+        nominal: nominal,
+      ),
       deadline: deadline,
       projectedCompletion: periodsLeft > 0
           ? deadline
@@ -185,6 +219,24 @@ abstract final class PlanScheduler {
     final int shortfall = expected - totalRead;
     if (shortfall <= 0) return 0;
     return _ceilDiv(shortfall, nominal);
+  }
+
+  /// How far past the plan's steady rate the reader had read by the start of
+  /// the period in progress.
+  static int _ayatAhead({
+    required ReminderSchedule schedule,
+    required DateTime start,
+    required DateTime now,
+    required int readBefore,
+    required int total,
+    required int nominal,
+  }) {
+    if (nominal <= 0) return 0;
+    final int elapsed = schedule.periodsBetween(start, now) - 1;
+    final int expected =
+        elapsed <= 0 ? 0 : (nominal * elapsed).clamp(0, total);
+    final int surplus = readBefore - expected;
+    return surplus > 0 ? surplus : 0;
   }
 
   /// A finish date at [perPeriod] ayat a period, estimated in calendar days.

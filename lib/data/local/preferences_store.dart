@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/enums.dart';
 import '../../domain/entities/notification_preferences.dart';
 import '../../domain/entities/reading_plan.dart';
+import '../../domain/entities/reading_track.dart';
 import '../../domain/entities/user_preferences.dart';
 import '../../domain/repositories/preferences_repository.dart';
 
@@ -25,9 +26,17 @@ class PreferencesStore implements PreferencesRepository {
   static const String _kOnboardingComplete = 'pref.onboarding_complete';
   static const String _kCurrentEdition = 'pref.current_edition_id';
   static const String _kSecondaryEdition = 'pref.secondary_edition_id';
+  static const String _kReadingTrack = 'pref.reading_track';
   static const String _kPlanKind = 'plan.kind';
   static const String _kPlanStartedOn = 'plan.started_on';
   static const String _kPlanTargetDate = 'plan.target_date';
+  static const String _kPlanReminderEnabled = 'plan.reminder_enabled';
+  static const String _kPlanReminderTime = 'plan.reminder_time';
+
+  /// Written with every save. A paced plan stored without it predates plans
+  /// having a track of their own — see [ReadingPlan.needsTrackSeed].
+  static const String _kPlanTrack = 'plan.track';
+  static const String _planTrackSeparate = 'separate';
 
   static const String _kNotifyEnabled = 'notify.enabled';
   static const String _kNotifyFrequency = 'notify.frequency';
@@ -48,6 +57,7 @@ class PreferencesStore implements PreferencesRepository {
       readingOrder: ReadingOrder.fromStorage(_prefs.getString(_kReadingOrder)),
       onboardingComplete: _prefs.getBool(_kOnboardingComplete) ?? false,
       plan: _loadPlan(),
+      readingTrack: ReadingTrack.fromStorage(_prefs.getString(_kReadingTrack)),
       currentEditionId: _prefs.getString(_kCurrentEdition),
       secondaryEditionId: _prefs.getString(_kSecondaryEdition),
     );
@@ -71,6 +81,12 @@ class PreferencesStore implements PreferencesRepository {
       targetDate: kind == ReadingPlanKind.custom && targetDate != null
           ? DateTime.fromMillisecondsSinceEpoch(targetDate)
           : null,
+      reminderEnabled: _prefs.getBool(_kPlanReminderEnabled) ?? true,
+      reminderTime: _prefs.containsKey(_kPlanReminderTime)
+          ? TimeOfDayValue.parse(_prefs.getString(_kPlanReminderTime))
+          : ReadingPlan.defaultReminderTime,
+      needsTrackSeed: kind.isPaced &&
+          _prefs.getString(_kPlanTrack) != _planTrackSeparate,
     );
   }
 
@@ -101,6 +117,27 @@ class PreferencesStore implements PreferencesRepository {
         _kPlanTargetDate,
         planTargetDate.millisecondsSinceEpoch,
       );
+    }
+    await _prefs.setBool(
+      _kPlanReminderEnabled,
+      preferences.plan.reminderEnabled,
+    );
+    await _prefs.setString(
+      _kPlanReminderTime,
+      preferences.plan.reminderTime.storageValue,
+    );
+    // Only a plan still waiting for its progress to be carried over may be
+    // saved without the marker, or the carry-over would never happen.
+    if (preferences.plan.needsTrackSeed) {
+      await _prefs.remove(_kPlanTrack);
+    } else {
+      await _prefs.setString(_kPlanTrack, _planTrackSeparate);
+    }
+    final ReadingTrack? track = preferences.readingTrack;
+    if (track == null) {
+      await _prefs.remove(_kReadingTrack);
+    } else {
+      await _prefs.setString(_kReadingTrack, track.storageKey);
     }
     final String? editionId = preferences.currentEditionId;
     if (editionId == null) {

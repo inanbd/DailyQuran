@@ -13,7 +13,7 @@ experience works offline. No account, no feed, no streaks.
 ## Contents
 
 - [Reading model](#reading-model)
-- [Reading plans](#reading-plans)
+- [The Qur'an Planner](#the-quran-planner)
 - [Qur'an text and source integrity](#quran-text-and-source-integrity)
 - [Choosing a translation](#choosing-a-translation)
 - [Word-by-word tarjama](#word-by-word-tarjama)
@@ -25,6 +25,7 @@ experience works offline. No account, no feed, no streaks.
 - [Notifications](#notifications)
 - [Testing](#testing)
 - [Building for release](#building-for-release)
+- [Releasing](#releasing)
 - [Accessibility](#accessibility)
 - [Privacy](#privacy)
 - [Licences](#licences)
@@ -38,10 +39,12 @@ The rule the whole app turns on:
 > **Stay on what you read this period once its portion is finished; otherwise
 > move to the first ayah you have not read.**
 
-On the default plan the portion is a single ayah, so it finishes the moment
+On the Daily Ayah the portion is a single ayah, so it finishes the moment
 anything is read and the rule reads as it always did — read one ayah, and the
-app holds you there for the rest of the day. On a plan asking for eighteen, the
-same sentence carries you through all eighteen and then stops.
+app holds you there for the rest of the day. On a plan asking for eighteen a
+day, the same sentence carries you through all eighteen and then stops. (The two
+are separate readings, each applying the rule to its own progress — see
+[The Qur'an Planner](#the-quran-planner).)
 
 That single rule produces the behaviour the product needs:
 
@@ -103,14 +106,17 @@ it is what makes changing translation cost nothing.
 
 ## The Qur'an Planner
 
-How much a reading period asks for, under **Settings → Qur'an Planner**:
+Finish the whole Qur'an by a day you choose. Under **Progress → Qur'an
+Planner** (also reachable from Settings):
 
-| Pace | What it works out to |
+| Plan | What it works out to |
 |---|---|
-| **One ayah a day** | One ayah a period, no end date. The default. |
-| **In a month** | About 202 ayat a day |
-| **In a year** | About 18 ayat a day |
-| **By a chosen date** | Whatever your date works out to — picked on a calendar, up to five years out |
+| **Finish in 1 month** | About 202 ayat a day |
+| **Finish in 1 year** | About 18 ayat a day |
+| **Pick a finish date** | Whatever your date works out to — picked on a calendar, up to five years out |
+
+With no plan, the app is what it always was: the Daily Ayah, one ayah a
+reading period.
 
 Both endpoints count as days you can read on, so a month is 31 readings rather
 than 30. The planner screen and the scheduler share that arithmetic
@@ -118,54 +124,72 @@ than 30. The planner screen and the scheduler share that arithmetic
 advertising 208 a day while the engine asked for 202 would be lying about the
 only number on it.
 
-A plan is either a *rate* or a *date*, and everything else follows from which.
-"One ayah a day" sets a rate and lets the finish date fall where it may; the
-others commit to a date — a month out, a year out, or wherever you put it —
-and let the rate follow from it.
+### Two readings, kept apart
 
-The planner's hero card keeps the whole journey visible: a ring of how much of
-the Qur'an is read, today's portion, the days remaining, and the day it all
-finishes on, with an honest sentence about whether you are on course, ahead,
-or behind.
+A plan is read on its own track, separate from the Daily Ayah. Each has its
+own place in the Qur'an and its own record of what has been read, so reading
+one never counts towards — or against — the other. The Today screen switches
+between them with **Daily Ayah** / **My Plan**; the Progress tab shows both.
 
-### Portions are per reading period, not per calendar day
+Under the hood a track is just a progress scope: the Daily Ayah keeps the
+edition's own scope (`quran`), where every reader's existing progress already
+lives, and the plan uses a sibling (`quran#plan`) — see
+[`ReadingTrack`](lib/domain/entities/reading_track.dart). A plan saved by an
+earlier version, when plans shared the Daily Ayah's progress, is carried over
+once at startup (`carryOverLegacyPlan`), so an update never sets it back.
 
-A plan divides by the number of times you actually read, not by the number of
-days on the calendar. A weekly reader working towards the same date gets a
-week's worth at a time. That is what `ReminderSchedule.periodsBetween` counts.
+### Today's goal, first
 
-### Missing days makes the next portion bigger
+A plan has its own daily reminder (on by default, 7:00 AM, changeable in the
+planner). Each reminder carries that day's goal — "202 ayat to read today" —
+and tapping it opens **Today's goal**: how much to read, how much is done,
+where the reading picks up, and how the plan is going, with one **Continue
+reading** button. Nothing is marked read by opening it.
+
+Because the goal changes from day to day, the plan's reminders are armed one
+day at a time — a rolling window of 30, re-armed whenever the app is used —
+rather than as one repeating alarm, each with the goal as it will stand that
+day. A day whose goal is already met gets no reminder. See
+[`PlanReminderComposer`](lib/domain/services/plan_reminder_composer.dart).
+
+The Daily Ayah's reminder is unchanged: tapping it opens the Daily Ayah and
+marks it read.
+
+### A plan's day is a calendar day
+
+A plan's goal is for the day on the calendar, midnight to midnight
+(`PlanScheduler.calendarDays`). The Daily Ayah still rolls on with its own
+reminder's cadence.
+
+### Missing days makes the next goal bigger
 
 Nothing is ever marked read because time passed, so missing a fortnight leaves
-exactly those ayat unread — with fewer periods left to read them in. The portion
-is simply
+exactly those ayat unread — with fewer days left to read them in. The goal is
+simply
 
-    what is left ÷ periods left
+    what is left ÷ days left
 
-recomputed every period, so it grows on its own and the date holds. There is no
-backlog written down anywhere, nothing to "clear", and no streak to break.
+recomputed every day, so it grows on its own and the date holds. Reading extra
+does the opposite: every day after gets lighter. There is no backlog written
+down anywhere, nothing to "clear", and no streak to break.
 
 Two guard rails stop that arithmetic turning cruel:
 
 - **Past the date**, a plan stops demanding everything at once. It falls back to
   its original steady rate and reports an honest new finish date instead.
-- **The target is computed from the state at the start of the period**, so it
-  cannot recede as you read through it — a portion of four stays a portion of
-  four until it is done.
+- **The goal is computed from the state at the start of the day**, so it
+  cannot recede as you read through it — a goal of four stays a goal of four
+  until it is done.
 
-And because a deadline still needs a way out, the planner offers two under
-**Begin anew**:
+And because a deadline still needs a way out, the planner offers three under
+**Start over**, none of which touch the Daily Ayah:
 
-- **Replan from today** re-baselines a plan without touching anything you have
-  read. Someone who put the app down for two months picks it up again at a sane
-  portion rather than an impossible one. A chosen-date plan is asked for its
-  new date, because re-measuring towards the old one is rarely what a fresh
-  start means.
-- **Restart from the beginning** (confirmed first — it cannot be undone) marks
-  every ayah unread and starts the reading and the plan again from the first
-  ayah. Favourites are kept. Restarting a finished reading from the Today
-  screen re-baselines the plan the same way; a chosen date that has already
-  gone is replaced by a new window of the same length.
+- **Plan again from today** keeps everything the plan has read and measures the
+  rest from today. A chosen-date plan is asked for its new date.
+- **Start from the first ayah** (confirmed first) clears the plan's reading and
+  starts it again from today.
+- **Stop my plan** (confirmed first) turns the planner off and clears the
+  plan's reading.
 
 The arithmetic is pure Dart in
 [`lib/domain/services/plan_scheduler.dart`](lib/domain/services/plan_scheduler.dart)
@@ -341,10 +365,11 @@ lib/
   domain/
     entities/     Editions, ayat, surahs, progress, plans, preferences
     repositories/ Abstract contracts
-    services/     Reminder maths, the reading rule, plan portions and
+    services/     Reminder maths, the reading rule, plan goals and
                   reminder text (all pure Dart)
   features/
     onboarding/ library/ progress/ settings/ shell/ splash/
+    planner/    The Qur'an Planner, today's goal screen, the plan's status
     today/      Reading surface, surah index, translation chooser,
                 auto-marking, swipe
   shared/
@@ -473,8 +498,10 @@ Two consequences worth knowing:
   on another device would still leave it a little behind, and the settings
   screen says so.
 
-Only readers who changed one of these settings pay for any of it: on the default
-plan revealing nothing, the message is a constant and no lookup happens at all.
+Only readers who changed one of these settings pay for any of it: on the default,
+revealing nothing, the message is a constant and no lookup happens at all. (A
+plan's own reminders are separate and always carry just the day's goal — see
+[The Qur'an Planner](#the-quran-planner).)
 
 Android needs core library desugaring for the notification plugin; it is already
 configured in `android/app/build.gradle.kts`, along with ProGuard rules that keep
@@ -520,8 +547,9 @@ flutter build appbundle --release   # Play Store
 flutter build apk --release         # sideload / testing
 ```
 
-Before publishing, replace the debug signing config in
-`android/app/build.gradle.kts` with your own keystore.
+Release builds sign with the key named in `android/key.properties`, and fall
+back to the debug key when that file is absent. `tool/new_keystore.ps1`
+creates the keystore and the properties file; neither is ever committed.
 
 **iOS**
 
@@ -533,6 +561,40 @@ Then open `ios/Runner.xcworkspace` in Xcode, set your team and bundle
 identifier, and distribute. `ios/Runner/AppDelegate.swift` already sets the
 `UNUserNotificationCenter` delegate, which is what lets a reminder show while the
 app is in the foreground and lets taps reach Dart.
+
+## Releasing
+
+Pushing a version tag builds the APK on GitHub Actions and publishes it as a
+GitHub Release, with that version's section of [`CHANGELOG.md`](CHANGELOG.md)
+as its notes ([`.github/workflows/release.yml`](.github/workflows/release.yml)):
+
+```bash
+# 1. Bump `version:` in pubspec.yaml and add a section to CHANGELOG.md.
+# 2. Commit, then tag and push:
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+The workflow analyzes, runs the tests, builds `DailyQuran-v1.2.0.apk`, and
+attaches it (with its SHA-256) to the release. It can also be run by hand from
+the Actions tab once the workflow is on the default branch.
+
+### Signing releases with your own key
+
+Without signing secrets, a release is signed with a throwaway debug key — fine
+for trying the app, but each such build has a different signature, so Android
+will not install one over another (or over a build you signed yourself)
+without uninstalling first. To sign with the app's own key, add these under
+**Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | The keystore file, base64-encoded: `[Convert]::ToBase64String([IO.File]::ReadAllBytes('android\keystore.jks'))` in PowerShell, or `base64 -w0 android/keystore.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | The keystore password |
+| `ANDROID_KEY_ALIAS` | The key alias (`dailyquran` if made with `tool/new_keystore.ps1`) |
+| `ANDROID_KEY_PASSWORD` | The key password, if different from the keystore's |
+
+Every release after that installs over the last.
 
 ## Accessibility
 

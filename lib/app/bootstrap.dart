@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/repositories/notification_scheduler.dart';
+import '../features/planner/plan_status.dart';
 import 'providers.dart';
 
 /// One-time startup work, run behind the splash screen.
@@ -17,6 +18,10 @@ final FutureProvider<BootstrapResult> bootstrapProvider =
     FutureProvider<BootstrapResult>((Ref ref) async {
   final NotificationScheduler scheduler =
       ref.read(notificationSchedulerProvider);
+
+  // Before anything reads the plan's track, and before its reminders are
+  // armed from it.
+  await carryOverLegacyPlan(ref);
 
   QuranDeepLink? launchLink;
   try {

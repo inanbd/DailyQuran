@@ -4,12 +4,18 @@ import 'package:intl/intl.dart';
 abstract final class Formatting {
   static final NumberFormat _integer = NumberFormat.decimalPattern();
   static final DateFormat _mediumDate = DateFormat.yMMMd();
+  static final DateFormat _monthDay = DateFormat.MMMd();
 
   /// `1896` → `1,896`.
   static String count(int value) => _integer.format(value);
 
   /// `Jan 12, 2026`.
   static String date(DateTime value) => _mediumDate.format(value);
+
+  /// `Jan 12` when [value] falls in the same year as [today], otherwise
+  /// `Jan 12, 2027` — the year only when it tells the reader something.
+  static String shortDate(DateTime value, {required DateTime today}) =>
+      value.year == today.year ? _monthDay.format(value) : date(value);
 
   /// `12.8%`, or `13%` when the fraction adds nothing.
   static String percent(double percentage) {

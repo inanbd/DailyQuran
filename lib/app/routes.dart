@@ -22,9 +22,15 @@ abstract final class Routes {
   static const String settingsNotifications = '$settings/notifications';
   static const String settingsReading = '$settings/reading';
   static const String settingsSecondTranslation = '$settings/second-translation';
-  static const String settingsPlan = '$settings/plan';
   static const String settingsAppearance = '$settings/appearance';
   static const String settingsAbout = '$settings/about';
+
+  /// The Qur'an Planner. Lives under Progress, beside the readings it plans.
+  static const String planner = '$progress/plan';
+
+  /// Today's goal for the reader's plan — where the plan's reminder opens.
+  /// Outside the tabs, so nothing competes with the one thing it asks.
+  static const String planGoal = '/goal';
 
   /// Tab order for the bottom navigation bar.
   static const List<String> tabs = <String>[

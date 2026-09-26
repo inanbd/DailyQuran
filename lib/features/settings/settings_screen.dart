@@ -49,8 +49,11 @@ class SettingsScreen extends ConsumerWidget {
               ),
               SettingsRow(
                 label: 'Qur’an Planner',
-                value: SettingsLabels.planValue(preferences.plan),
-                onTap: () => context.go(Routes.settingsPlan),
+                value: SettingsLabels.planValue(
+                  preferences.plan,
+                  today: ref.watch(clockProvider)(),
+                ),
+                onTap: () => context.go(Routes.planner),
               ),
               SettingsRow(
                 label: 'Ayah text',

@@ -17,7 +17,8 @@ import '../domain/entities/ayah.dart';
 import '../domain/entities/enums.dart';
 import '../domain/entities/notification_preferences.dart';
 import '../domain/entities/quran_edition.dart';
-import '../domain/entities/reading_progress.dart';
+import '../domain/entities/reading_plan.dart';
+import '../domain/entities/reading_track.dart';
 import '../domain/entities/user_preferences.dart';
 import '../domain/repositories/favourites_repository.dart';
 import '../domain/repositories/notification_scheduler.dart';
@@ -26,9 +27,8 @@ import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/quran_content_source.dart';
 import '../domain/repositories/quran_repository.dart';
 import '../domain/repositories/speech_synthesizer.dart';
-import '../domain/services/plan_scheduler.dart';
+import '../domain/services/plan_reminder_composer.dart';
 import '../domain/services/reminder_message_composer.dart';
-import '../domain/services/reminder_schedule.dart';
 
 /// Thrown if a provider that must be overridden at startup is read directly.
 Never _mustOverride(String name) =>
@@ -206,6 +206,7 @@ class NotificationPreferencesController
         preferences: state,
         editionId: ref.read(userPreferencesProvider).currentEditionId,
         message: await _composeMessage(),
+        planReminders: await _composePlanReminders(),
       );
     } on Object catch (error, stack) {
       debugPrint('Daily Quran: could not arm reminders: $error\n$stack');
@@ -213,7 +214,7 @@ class NotificationPreferencesController
     ref.invalidate(reminderReadinessProvider);
   }
 
-  /// The text the next reminder should carry.
+  /// The text the Daily Ayah's next reminder should carry.
   ///
   /// Reads repositories directly rather than the Today controller, which would
   /// be a cycle — the Today screen watches these preferences to know where its
@@ -228,17 +229,14 @@ class NotificationPreferencesController
     // anything the OS is holding.
     if (!state.enabled) return ReminderMessage.invitation;
 
-    final UserPreferences preferences = ref.read(userPreferencesProvider);
-
-    // The default install — one ayah a period, revealing nothing — has a fixed
-    // answer, so nothing is added to startup for a reader who changed neither
-    // setting.
-    if (state.content == ReminderContent.invitation &&
-        !preferences.plan.isPaced) {
+    // The default — revealing nothing — has a fixed answer, so nothing is
+    // added to startup for a reader who never changed it. The Daily Ayah is
+    // one ayah a period whatever a plan is doing, so there is no count to add.
+    if (state.content == ReminderContent.invitation) {
       return ReminderMessage.invitation;
     }
 
-    final String? editionId = preferences.currentEditionId;
+    final String? editionId = ref.read(userPreferencesProvider).currentEditionId;
     if (editionId == null) return ReminderMessage.invitation;
 
     try {
@@ -248,46 +246,64 @@ class NotificationPreferencesController
         return ReminderMessage.invitation;
       }
 
-      final ProgressRepository progressRepository =
-          ref.read(progressRepositoryProvider);
-      final ReadingProgress progress = await progressRepository.progressFor(
-        edition.scope,
-        edition.totalAyah,
-      );
-
-      // Sized for the period the reminder will *land* in, not the one being
-      // left: on a catch-up plan those are different numbers, and the reader
-      // should be told the one they are about to be asked for.
-      final DateTime now = ref.read(clockProvider)();
-      final DateTime arrivesAt =
-          ReminderSchedule(state).nextOccurrenceAfter(now) ?? now;
-      final ReadingPortion portion = PlanScheduler.resolve(
-        plan: preferences.plan,
-        progress: progress,
-        notificationPreferences: state,
-        readThisPeriod: 0,
-        now: arrivesAt,
-      );
-
-      // The ayah named is the one the reader will actually land on — the first
-      // they have not read, never wherever they last browsed to.
-      Ayah? ayah;
-      if (state.content != ReminderContent.invitation) {
-        final int? ordinal = await progressRepository.firstUnreadOrdinal(
-          edition.scope,
-          edition.totalAyah,
-        );
-        if (ordinal != null) ayah = await quran.ayahAt(editionId, ordinal);
-      }
+      // The ayah named is the one the reader will actually land on — the
+      // Daily Ayah's first unread, never wherever they last browsed to, and
+      // never the plan's.
+      final int? ordinal = await ref
+          .read(progressRepositoryProvider)
+          .firstUnreadOrdinal(edition.scope, edition.totalAyah);
+      final Ayah? ayah =
+          ordinal == null ? null : await quran.ayahAt(editionId, ordinal);
 
       return ReminderMessageComposer.compose(
         content: state.content,
-        ayatToRead: portion.target,
+        ayatToRead: 1,
         ayah: ayah,
       );
     } on Object catch (error) {
       debugPrint('Daily Quran: falling back to a plain reminder ($error)');
       return ReminderMessage.invitation;
+    }
+  }
+
+  /// The plan's reminders for the days ahead, each carrying that day's goal.
+  ///
+  /// Empty without a plan, with its reminder off, or on any failure — the
+  /// Daily Ayah's reminder must never be lost to a problem with the plan's.
+  Future<List<PlanReminder>> _composePlanReminders() async {
+    final UserPreferences preferences = ref.read(userPreferencesProvider);
+    final ReadingPlan plan = preferences.plan;
+    final String? editionId = preferences.currentEditionId;
+    if (!plan.isPaced || !plan.reminderEnabled || editionId == null) {
+      return const <PlanReminder>[];
+    }
+
+    try {
+      final QuranEdition? edition =
+          await ref.read(quranRepositoryProvider).edition(editionId);
+      if (edition == null || edition.totalAyah <= 0) {
+        return const <PlanReminder>[];
+      }
+
+      final ProgressRepository progressRepository =
+          ref.read(progressRepositoryProvider);
+      final String scope = ReadingTrack.plan.scopeFor(edition.scope);
+      final DateTime now = ref.read(clockProvider)();
+      return PlanReminderComposer.compose(
+        plan: plan,
+        progress: await progressRepository.progressFor(
+          scope,
+          edition.totalAyah,
+        ),
+        readToday: await progressRepository.readCountSince(
+          scope,
+          DateTime(now.year, now.month, now.day),
+        ),
+        now: now,
+      );
+    } on Object catch (error) {
+      debugPrint('Daily Quran: plan reminders not armed ($error)');
+      return const <PlanReminder>[];
     }
   }
 }

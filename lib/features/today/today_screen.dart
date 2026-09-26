@@ -14,8 +14,10 @@ import '../../core/utils/formatting.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/quran_edition.dart';
 import '../../domain/entities/reading_progress.dart';
+import '../../domain/entities/reading_track.dart';
 import '../../domain/entities/user_preferences.dart';
 import '../../domain/services/plan_scheduler.dart';
+import '../planner/planner_widgets.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
 import '../../shared/theme/app_typography.dart';
@@ -94,9 +96,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         return false;
       },
       child: AppPage(
-        // A plan asking for more than one ayah makes "Today's Ayah" a
-        // misdescription of what is on the page.
-        title: state.value?.hasPortion ?? false
+        // A plan's goal is a reading, not an ayah, so the page says so.
+        title: state.value?.isPlan ?? false
             ? 'Today’s Reading'
             : 'Today’s Ayah',
         actions: <Widget>[_SurahsButton(editionId: state.value?.edition?.id)],
@@ -202,6 +203,22 @@ class _TodayBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final Widget content = _content(context, ref);
+    if (!state.hasPlan) return content;
+
+    // With a plan there are two readings, and the reader picks between them
+    // here — never by wondering which one the page is showing.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _TrackSwitch(track: state.track),
+        const SizedBox(height: AppSpacing.xl),
+        content,
+      ],
+    );
+  }
+
+  Widget _content(BuildContext context, WidgetRef ref) {
     final QuranEdition? edition = state.edition;
     if (edition == null) return const _NoEditionChosen();
 
@@ -209,6 +226,7 @@ class _TodayBody extends ConsumerWidget {
       return CompletionView(
         edition: edition,
         progress: state.progress!,
+        isPlan: state.isPlan,
         onReadAgain: () => ref.read(todayControllerProvider.notifier).restart(),
         onChooseAnother: () => context.go(Routes.library),
       );
@@ -301,8 +319,8 @@ class _TodayBody extends ConsumerWidget {
           // Nothing to look at: the point past which the whole ayah, citation
           // included, has been on screen.
           SizedBox(key: endOfAyahKey, height: AppSpacing.xxl),
-          if (state.hasPortion) ...<Widget>[
-            _PortionBar(portion: state.portion!),
+          if (state.isPlan && state.portion != null) ...<Widget>[
+            _GoalCard(portion: state.portion!),
             const SizedBox(height: AppSpacing.lg),
           ],
           ReadingProgressBar(
@@ -337,59 +355,137 @@ class _TodayBody extends ConsumerWidget {
   }
 }
 
-/// How far through this reading period's portion the reader is.
-///
-/// Only rendered on a plan that asks for more than one ayah — counting to one
-/// is noise, and it is what the default plan would show every day.
-class _PortionBar extends StatelessWidget {
-  const _PortionBar({required this.portion});
+/// Chooses between the Daily Ayah and the plan's reading.
+class _TrackSwitch extends ConsumerWidget {
+  const _TrackSwitch({required this.track});
+
+  final ReadingTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AppColors colors = context.colors;
+    Color pick(Set<WidgetState> states, Color on, Color off) =>
+        states.contains(WidgetState.selected) ? on : off;
+
+    return SegmentedButton<ReadingTrack>(
+      segments: const <ButtonSegment<ReadingTrack>>[
+        ButtonSegment<ReadingTrack>(
+          value: ReadingTrack.daily,
+          label: Text('Daily Ayah'),
+          icon: Icon(Icons.wb_sunny_outlined, size: 18),
+        ),
+        ButtonSegment<ReadingTrack>(
+          value: ReadingTrack.plan,
+          label: Text('My Plan'),
+          icon: Icon(Icons.flag_outlined, size: 18),
+        ),
+      ],
+      selected: <ReadingTrack>{track},
+      showSelectedIcon: false,
+      expandedInsets: EdgeInsets.zero,
+      onSelectionChanged: (Set<ReadingTrack> chosen) => ref
+          .read(todayControllerProvider.notifier)
+          .switchTrack(chosen.first),
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (Set<WidgetState> states) =>
+              pick(states, colors.accentSoft, colors.surface),
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (Set<WidgetState> states) =>
+              pick(states, colors.accent, colors.textSecondary),
+        ),
+        side: WidgetStatePropertyAll<BorderSide>(
+          BorderSide(color: colors.border),
+        ),
+        textStyle: const WidgetStatePropertyAll<TextStyle>(
+          TextStyle(
+            fontFamily: AppFonts.english,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        minimumSize: const WidgetStatePropertyAll<Size>(
+          Size.fromHeight(AppSpacing.minTapTarget),
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's goal on the plan's reading: how much is read, and — when the goal
+/// has grown or shrunk — the plain reason why.
+class _GoalCard extends StatelessWidget {
+  const _GoalCard({required this.portion});
 
   final ReadingPortion portion;
 
   @override
   Widget build(BuildContext context) {
     final AppColors colors = context.colors;
+    final String? why = portion.isComplete
+        ? null
+        : portion.isCatchingUp
+            ? 'You missed some reading, so today’s goal is a little bigger.'
+            : portion.isAhead
+                ? 'You read extra before, so today’s goal is smaller.'
+                : null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        ReadingProgressBar(
-          read: portion.read,
-          total: portion.target,
-          label: portion.isComplete
-              ? 'Today’s portion is done'
-              : 'Today · ${Formatting.count(portion.read)} of '
-                  '${Formatting.count(portion.target)}',
-        ),
-        if (portion.isCatchingUp) ...<Widget>[
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            // Says why the number grew, without making a scold of it. The plan
-            // spreads what was missed over the days it has left, so the date
-            // holds — which is the whole reason it is asking for more.
-            'More than the usual ${Formatting.count(portion.nominal)}: what '
-            'you missed is spread over the days left, so the plan still '
-            'reaches its date.',
-            style: AppTypography.reference.copyWith(
-              color: colors.textSecondary,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.lg,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(color: colors.warm.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  'Today’s goal',
+                  style: AppTypography.sectionTitle.copyWith(
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.go(Routes.planner),
+                child: const Text('Planner'),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
+            child: ReadingProgressBar(
+              read: portion.read,
+              total: portion.target,
+              label: portion.isComplete
+                  ? 'Today’s goal is done'
+                  : portion.progressWords,
             ),
           ),
-        ] else if (portion.isAhead) ...<Widget>[
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            // The same sentence the other way up. Reading ahead thins every
-            // remaining day rather than buying a day off, and without saying so
-            // the drop from the advertised rate looks like the plan losing
-            // count of itself.
-            'Fewer than the usual ${Formatting.count(portion.nominal)}: '
-            'reading ahead is taken off the days that remain, so the plan '
-            'finishes on the same date.',
-            style: AppTypography.reference.copyWith(
-              color: colors.textSecondary,
+          if (why != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: Text(
+                why,
+                style: AppTypography.reference.copyWith(
+                  color: colors.textSecondary,
+                ),
+              ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -571,11 +667,16 @@ class CompletionView extends StatelessWidget {
     required this.progress,
     required this.onReadAgain,
     required this.onChooseAnother,
+    this.isPlan = false,
     super.key,
   });
 
   final QuranEdition edition;
   final ReadingProgress progress;
+
+  /// Whether this is the plan's reading that was finished, rather than the
+  /// Daily Ayah's.
+  final bool isPlan;
   final VoidCallback onReadAgain;
   final VoidCallback onChooseAnother;
 
@@ -594,7 +695,10 @@ class CompletionView extends StatelessWidget {
         Text(
           edition.isFixture
               ? 'You reached the end of ${edition.titleEnglish}.'
-              : 'You completed the Qur’an, reading ${edition.titleEnglish}.',
+              : isPlan
+                  ? 'You finished your plan and the whole Qur’an, reading '
+                      '${edition.titleEnglish}.'
+                  : 'You completed the Qur’an, reading ${edition.titleEnglish}.',
           style: AppTypography.translationBody
               .copyWith(color: colors.textPrimary),
         ),

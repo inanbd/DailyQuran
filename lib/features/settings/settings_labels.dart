@@ -45,24 +45,23 @@ abstract final class SettingsLabels {
   static String planName(ReadingPlanKind kind) {
     switch (kind) {
       case ReadingPlanKind.oneAyah:
-        return 'One ayah a day';
+        return 'Off';
       case ReadingPlanKind.oneMonth:
-        return 'In a month';
+        return 'Finish in 1 month';
       case ReadingPlanKind.oneYear:
-        return 'In a year';
+        return 'Finish in 1 year';
       case ReadingPlanKind.custom:
-        return 'By a chosen date';
+        return 'Pick a finish date';
     }
   }
 
-  /// The plan as a settings-row value — a chosen-date plan is named by its
-  /// date, which is the whole of what the reader chose.
-  static String planValue(ReadingPlan plan) {
-    final DateTime? target = plan.targetDate;
-    if (plan.kind == ReadingPlanKind.custom && target != null) {
-      return 'By ${Formatting.date(target)}';
-    }
-    return planName(plan.kind);
+  /// The plan as a settings-row value: off, or the day it finishes on —
+  /// which is the one thing about a plan a reader needs reminding of.
+  static String planValue(ReadingPlan plan, {required DateTime today}) {
+    if (!plan.isPaced) return 'Off';
+    final DateTime? finish = plan.deadlineFrom(plan.startedOn ?? today);
+    if (finish == null) return planName(plan.kind);
+    return 'By ${Formatting.date(finish)}';
   }
 
   /// What a reminder will say, as the example itself rather than a description

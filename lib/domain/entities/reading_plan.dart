@@ -1,5 +1,7 @@
 import 'package:meta/meta.dart';
 
+import 'notification_preferences.dart';
+
 /// The pace a reader has chosen to work through the Qur'an at.
 ///
 /// Two shapes, deliberately: a plan either sets a *rate* and lets the finish
@@ -51,13 +53,28 @@ enum ReadingPlanKind {
 /// It is re-baselined rather than enforced — a reader who falls a long way
 /// behind can start the plan again from today instead of facing an impossible
 /// portion, which is the humane escape hatch a deadline needs.
+///
+/// A paced plan is read on its own track (see `ReadingTrack.plan`), with its
+/// own reminder, so it never borrows from or counts against the Daily Ayah.
 @immutable
 class ReadingPlan {
-  const ReadingPlan({required this.kind, this.startedOn, this.targetDate});
+  const ReadingPlan({
+    required this.kind,
+    this.startedOn,
+    this.targetDate,
+    this.reminderEnabled = true,
+    this.reminderTime = defaultReminderTime,
+    this.needsTrackSeed = false,
+  });
 
-  /// One ayah a period, no deadline. What every reader gets until they choose
+  /// No plan: the Daily Ayah alone. What every reader gets until they choose
   /// otherwise.
   static const ReadingPlan defaults = ReadingPlan(kind: ReadingPlanKind.oneAyah);
+
+  /// When the plan's own reminder arrives unless the reader moves it. Early,
+  /// because the reminder announces the day's goal, and a goal is most use
+  /// before the day has been planned.
+  static const TimeOfDayValue defaultReminderTime = TimeOfDayValue(7, 0);
 
   final ReadingPlanKind kind;
 
@@ -69,6 +86,19 @@ class ReadingPlan {
   /// The finish date a [ReadingPlanKind.custom] plan works towards. Null on
   /// every other kind, whose date follows from the start instead.
   final DateTime? targetDate;
+
+  /// Whether the plan sends its own daily reminder with the day's goal.
+  final bool reminderEnabled;
+
+  /// When that reminder arrives, as wall-clock time.
+  final TimeOfDayValue reminderTime;
+
+  /// Set on a plan saved before plans had a track of their own.
+  ///
+  /// Such a plan was read on the Daily Ayah's track, so its progress lives
+  /// there. Startup copies that progress onto the plan's track once, so an
+  /// upgrade never sets a plan back to its first ayah, and then clears this.
+  final bool needsTrackSeed;
 
   /// Whether the plan has a date it can actually compute.
   ///
@@ -117,6 +147,9 @@ class ReadingPlan {
     ReadingPlanKind? kind,
     DateTime? startedOn,
     DateTime? targetDate,
+    bool? reminderEnabled,
+    TimeOfDayValue? reminderTime,
+    bool? needsTrackSeed,
     bool clearStartedOn = false,
     bool clearTargetDate = false,
   }) {
@@ -124,6 +157,9 @@ class ReadingPlan {
       kind: kind ?? this.kind,
       startedOn: clearStartedOn ? null : (startedOn ?? this.startedOn),
       targetDate: clearTargetDate ? null : (targetDate ?? this.targetDate),
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderTime: reminderTime ?? this.reminderTime,
+      needsTrackSeed: needsTrackSeed ?? this.needsTrackSeed,
     );
   }
 
@@ -136,10 +172,20 @@ class ReadingPlan {
       other is ReadingPlan &&
       other.kind == kind &&
       other.startedOn == startedOn &&
-      other.targetDate == targetDate;
+      other.targetDate == targetDate &&
+      other.reminderEnabled == reminderEnabled &&
+      other.reminderTime == reminderTime &&
+      other.needsTrackSeed == needsTrackSeed;
 
   @override
-  int get hashCode => Object.hash(kind, startedOn, targetDate);
+  int get hashCode => Object.hash(
+        kind,
+        startedOn,
+        targetDate,
+        reminderEnabled,
+        reminderTime,
+        needsTrackSeed,
+      );
 
   @override
   String toString() =>

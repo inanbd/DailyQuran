@@ -5,6 +5,7 @@ import '../../app/providers.dart';
 import '../../core/utils/formatting.dart';
 import '../../domain/entities/enums.dart';
 import '../../domain/entities/notification_preferences.dart';
+import '../../domain/entities/user_preferences.dart';
 import '../../domain/repositories/notification_scheduler.dart';
 import '../../domain/services/reminder_schedule.dart';
 import '../../shared/theme/app_colors.dart';
@@ -59,9 +60,9 @@ class NotificationSettingsScreen extends ConsumerWidget {
               SettingsRow(
                 label: 'Daily reminder',
                 description: preferences.enabled
-                    ? 'A gentle prompt when your next ayah is ready.'
+                    ? 'A gentle prompt when your next Daily Ayah is ready.'
                     : 'Turn on reminders whenever you’d like a gentle prompt '
-                        'to read your next ayah.',
+                        'to read your next Daily Ayah.',
                 trailing: Switch(
                   value: preferences.enabled,
                   onChanged: (bool value) => _setEnabled(context, ref, value),
@@ -69,6 +70,20 @@ class NotificationSettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          if (ref.watch(
+            userPreferencesProvider.select(
+              (UserPreferences prefs) => prefs.plan.isPaced,
+            ),
+          )) ...<Widget>[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Your Qur’an plan has its own reminder with each day’s goal. '
+              'You can change it in the Qur’an Planner.',
+              style: AppTypography.reference.copyWith(
+                color: context.colors.textSecondary,
+              ),
+            ),
+          ],
           if (preferences.enabled) ...<Widget>[
             const SizedBox(height: AppSpacing.xl),
             SettingsGroup(

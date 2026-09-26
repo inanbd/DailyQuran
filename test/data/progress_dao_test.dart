@@ -155,4 +155,49 @@ void main() {
     expect(progress.totalRead, 1);
     expect(progress.fraction, lessThanOrEqualTo(1.0));
   });
+
+  group('copying a scope', () {
+    test('carries every read ayah and the position over', () async {
+      await dao.markRead(scope, verse(1), 1, total);
+      await dao.markRead(scope, verse(2), 2, total);
+      await dao.setCurrentOrdinal(scope, 3, total);
+
+      await dao.copyScope(scope, 'quran#plan');
+
+      final ReadingProgress copy = await dao.progressFor('quran#plan', total);
+      expect(copy.totalRead, 2);
+      expect(copy.currentOrdinal, 3);
+      expect(copy.startedAt, isNotNull);
+      expect(await dao.firstUnreadOrdinal('quran#plan', total), 3);
+    });
+
+    test('leaves the original to carry on alone', () async {
+      await dao.markRead(scope, verse(1), 1, total);
+      await dao.copyScope(scope, 'quran#plan');
+
+      // Read on after the copy: the two are separate from here on.
+      await dao.markRead(scope, verse(2), 2, total);
+      await dao.markRead('quran#plan', verse(5), 5, total);
+
+      expect((await dao.progressFor(scope, total)).totalRead, 2);
+      expect((await dao.progressFor('quran#plan', total)).totalRead, 2);
+      expect(await dao.isRead(scope, verse(5)), isFalse);
+      expect(await dao.isRead('quran#plan', verse(2)), isFalse);
+    });
+
+    test('never overwrites what the target already holds', () async {
+      await dao.markRead('quran#plan', verse(4), 4, total);
+      await dao.setCurrentOrdinal('quran#plan', 4, total);
+      await dao.markRead(scope, verse(1), 1, total);
+      await dao.setCurrentOrdinal(scope, 9, total);
+
+      await dao.copyScope(scope, 'quran#plan');
+
+      final ReadingProgress target = await dao.progressFor('quran#plan', total);
+      // Its own read ayah kept, the copied one added, its own place kept.
+      expect(await dao.isRead('quran#plan', verse(4)), isTrue);
+      expect(await dao.isRead('quran#plan', verse(1)), isTrue);
+      expect(target.currentOrdinal, 4);
+    });
+  });
 }

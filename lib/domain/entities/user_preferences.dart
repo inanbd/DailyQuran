@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 
 import 'enums.dart';
 import 'reading_plan.dart';
+import 'reading_track.dart';
 
 /// Reading and appearance preferences. Small enough to live in key-value
 /// storage; nothing here is personal data.
@@ -16,6 +17,7 @@ class UserPreferences {
     required this.readingOrder,
     required this.onboardingComplete,
     this.plan = ReadingPlan.defaults,
+    this.readingTrack,
     this.currentEditionId,
     this.secondaryEditionId,
   });
@@ -57,6 +59,20 @@ class UserPreferences {
   /// no change at all.
   final ReadingPlan plan;
 
+  /// The reading the Today screen last showed, or null when the reader has
+  /// never switched between them.
+  final ReadingTrack? readingTrack;
+
+  /// The reading the Today screen shows.
+  ///
+  /// Without a plan there is only the Daily Ayah. With one, it is whichever
+  /// the reader last chose — and the plan until they choose, because a reader
+  /// who has just set a goal expects to be taken to it.
+  ReadingTrack get activeTrack {
+    if (!plan.isPaced) return ReadingTrack.daily;
+    return readingTrack ?? ReadingTrack.plan;
+  }
+
   /// The edition the Today screen reads from. Null before onboarding finishes.
   final String? currentEditionId;
 
@@ -87,6 +103,7 @@ class UserPreferences {
     ReadingOrder? readingOrder,
     bool? onboardingComplete,
     ReadingPlan? plan,
+    ReadingTrack? readingTrack,
     String? currentEditionId,
     String? secondaryEditionId,
     /// Drops the second translation. Needed because a null
@@ -103,6 +120,7 @@ class UserPreferences {
       readingOrder: readingOrder ?? this.readingOrder,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
       plan: plan ?? this.plan,
+      readingTrack: readingTrack ?? this.readingTrack,
       currentEditionId: currentEditionId ?? this.currentEditionId,
       secondaryEditionId: clearSecondaryEdition
           ? null

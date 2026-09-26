@@ -289,6 +289,35 @@ void main() {
     expect(portion.isCatchingUp, isFalse);
   });
 
+  test('a reader exactly on pace is not told they read extra', () {
+    // 6,236 over the 31 days is 201.2 a day, asked for as 202. Six days at
+    // 202 is exactly on pace, yet what is left now works out to 201 a day —
+    // lower than the steady rate through rounding alone, not extra reading.
+    final ReadingPortion portion = resolve(
+      kind: ReadingPlanKind.oneMonth,
+      totalRead: 1212,
+      now: DateTime(2026, 1, 7, 9, 0),
+      totalAyah: 6236,
+    );
+
+    expect(portion.target, lessThan(portion.nominal));
+    expect(portion.ayatAhead, 0);
+    expect(portion.isAhead, isFalse);
+    expect(portion.isCatchingUp, isFalse);
+  });
+
+  test('extra reading is counted as how far ahead the reader is', () {
+    final ReadingPortion portion = resolve(
+      kind: ReadingPlanKind.oneMonth,
+      totalRead: 600,
+      now: DateTime(2026, 1, 2, 9, 0),
+      totalAyah: 6236,
+    );
+
+    // One day at the steady 202 was expected; 600 were read.
+    expect(portion.ayatAhead, 398);
+  });
+
   test('a finished reading is not reported as ahead', () {
     // `finished` carries a zero target, which must not read as "less than the
     // usual" and put a stray line of encouragement on a completed plan.

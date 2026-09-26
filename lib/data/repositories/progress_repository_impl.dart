@@ -62,4 +62,7 @@ class ProgressRepositoryImpl implements ProgressRepository {
   @override
   Future<ReadingProgress> resetScope(String scope, int totalAyah) =>
       _dao.resetScope(scope, totalAyah);
+
+  @override
+  Future<void> copyScope(String from, String to) => _dao.copyScope(from, to);
 }

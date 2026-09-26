@@ -10,21 +10,39 @@ import '../entities/reminder_readiness.dart';
 export '../entities/reminder_message.dart';
 export '../entities/reminder_readiness.dart';
 
+/// Which reminder a notification was: the Daily Ayah's, or a reading plan's.
+enum ReminderKind {
+  /// The Daily Ayah reminder. Opening it opens the ayah, and counts as
+  /// reading it.
+  daily,
+
+  /// A reading plan's reminder. Opening it shows the day's goal first, and
+  /// reads nothing on the reader's behalf.
+  plan,
+}
+
 /// Where a tapped notification should take the reader.
 @immutable
 class QuranDeepLink {
-  const QuranDeepLink({required this.editionId});
+  const QuranDeepLink({
+    required this.editionId,
+    this.kind = ReminderKind.daily,
+  });
 
   /// The edition the reminder was for. The reader is taken to their current
   /// position in it — never to an ayah chosen by the notification itself.
   final String editionId;
 
-  @override
-  bool operator ==(Object other) =>
-      other is QuranDeepLink && other.editionId == editionId;
+  final ReminderKind kind;
 
   @override
-  int get hashCode => editionId.hashCode;
+  bool operator ==(Object other) =>
+      other is QuranDeepLink &&
+      other.editionId == editionId &&
+      other.kind == kind;
+
+  @override
+  int get hashCode => Object.hash(editionId, kind);
 }
 
 /// Everything the app needs from the platform's local-notification support.
@@ -61,7 +79,10 @@ abstract interface class NotificationScheduler {
   Future<bool> openSystemNotificationSettings();
 
   /// Cancels everything pending and re-arms from [preferences], showing
-  /// [message].
+  /// [message], along with each of [planReminders].
+  ///
+  /// The two are independent: the Daily Ayah reminder follows [preferences]
+  /// and may be off while a plan's reminders are on, or the other way round.
   ///
   /// Called whenever preferences change and on every app start, which is what
   /// keeps reminders correct across reboots, app updates, DST transitions and
@@ -75,6 +96,7 @@ abstract interface class NotificationScheduler {
     required NotificationPreferences preferences,
     required String? editionId,
     ReminderMessage message = ReminderMessage.invitation,
+    List<PlanReminder> planReminders = const <PlanReminder>[],
   });
 
   Future<void> cancelAll();

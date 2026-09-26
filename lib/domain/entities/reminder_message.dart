@@ -28,3 +28,29 @@ class ReminderMessage {
   @override
   String toString() => 'ReminderMessage($title / $body)';
 }
+
+/// One reminder for a reading plan: when it arrives and what it says.
+///
+/// A plan's goal changes from day to day — it grows after a missed day and
+/// shrinks after a long one — so a single repeating alarm with fixed text
+/// would soon be announcing the wrong number. Each day's reminder is armed on
+/// its own instead, carrying the goal as it will stand that day.
+@immutable
+class PlanReminder {
+  const PlanReminder({required this.at, required this.message});
+
+  /// When the reminder arrives, as wall-clock time.
+  final DateTime at;
+
+  final ReminderMessage message;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlanReminder && other.at == at && other.message == message;
+
+  @override
+  int get hashCode => Object.hash(at, message);
+
+  @override
+  String toString() => 'PlanReminder($at: $message)';
+}

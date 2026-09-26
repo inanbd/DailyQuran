@@ -1,7 +1,9 @@
 # Builds the Android APK and publishes it as a GitHub Release.
 #
-# Runs when a version tag is pushed (git tag v1.2.0 && git push origin v1.2.0),
-# or by hand from the Actions tab with the tag to publish.
+# Releases the version in pubspec.yaml whenever a push changes it (or this
+# file), unless that version is already released — so publishing a release
+# is: bump the version, add its CHANGELOG section, push. Pushing a v* tag, or
+# running it by hand from the Actions tab, also works.
 #
 # Signing: with the four ANDROID_* secrets set (see README, "Releasing"), the
 # APK is signed with the app's own release key and installs over any earlier
@@ -12,6 +14,11 @@ name: Release APK
 on:
   push:
     tags: ['v*']
+    branches: ['**']
+    # Path filters apply to branch pushes only; a tag push always runs.
+    paths:
+      - pubspec.yaml
+      - .github/workflows/release.yml
   workflow_dispatch:
     inputs:
       tag:
@@ -22,15 +29,49 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+      publish: ${{ steps.pick.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: pick
+        name: Pick the version to release
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            tag="$INPUT_TAG"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(sed -nE 's/^version:[[:space:]]*([0-9A-Za-z.-]+).*/\1/p' pubspec.yaml)"
+          fi
+          publish=true
+          # A branch push releases each version once; later pushes of the same
+          # version change nothing.
+          if [ "$GITHUB_REF_TYPE" = "branch" ] &&
+             git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            publish=false
+            echo "$tag is already released; nothing to do."
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Releasing: $tag ($publish)"
+
   apk:
+    needs: version
+    if: needs.version.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      TAG: ${{ needs.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 

@@ -564,20 +564,19 @@ app is in the foreground and lets taps reach Dart.
 
 ## Releasing
 
-Pushing a version tag builds the APK on GitHub Actions and publishes it as a
-GitHub Release, with that version's section of [`CHANGELOG.md`](CHANGELOG.md)
-as its notes ([`.github/workflows/release.yml`](.github/workflows/release.yml)):
+Releases are built on GitHub Actions and published as GitHub Releases, with
+that version's section of [`CHANGELOG.md`](CHANGELOG.md) as the notes
+([`.github/workflows/release.yml`](.github/workflows/release.yml)). To publish
+one:
 
-```bash
-# 1. Bump `version:` in pubspec.yaml and add a section to CHANGELOG.md.
-# 2. Commit, then tag and push:
-git tag v1.2.0
-git push origin v1.2.0
-```
+1. Bump `version:` in `pubspec.yaml` (e.g. `1.2.0+3` → `1.2.1+4`).
+2. Add a `## 1.2.1` section to `CHANGELOG.md`.
+3. Commit and push.
 
-The workflow analyzes, runs the tests, builds `DailyQuran-v1.2.0.apk`, and
-attaches it (with its SHA-256) to the release. It can also be run by hand from
-the Actions tab once the workflow is on the default branch.
+A push that changes the version releases it as `v1.2.1` — once; pushing the
+same version again does nothing. The workflow analyzes, runs the tests, builds
+`DailyQuran-v1.2.1.apk`, and attaches it (with its SHA-256) to the release.
+Pushing a `v*` tag, or running the workflow from the Actions tab, also works.
 
 ### Signing releases with your own key
 

@@ -55,6 +55,8 @@ void main() {
         AppDatabase.progressTable,
         AppDatabase.readTable,
         AppDatabase.favouritesTable,
+        AppDatabase.readingDaysTable,
+        AppDatabase.milestonesTable,
       ]),
     );
   });

@@ -193,4 +193,100 @@ void main() {
       }
     });
   });
+
+  group('several reminders a day', () {
+    final NotificationPreferences threeADay = prefs().withTimes(
+      const <TimeOfDayValue>[
+        TimeOfDayValue(21, 0),
+        TimeOfDayValue(8, 0),
+        TimeOfDayValue(13, 30),
+      ],
+    );
+
+    test('are kept earliest first, the earliest beginning the day', () {
+      expect(threeADay.time, const TimeOfDayValue(8, 0));
+      expect(threeADay.laterTimes, const <TimeOfDayValue>[
+        TimeOfDayValue(13, 30),
+        TimeOfDayValue(21, 0),
+      ]);
+    });
+
+    test('drop repeats and stop at five', () {
+      final NotificationPreferences many = prefs().withTimes(
+        <TimeOfDayValue>[
+          for (int hour = 6; hour <= 22; hour += 2) TimeOfDayValue(hour, 0),
+          const TimeOfDayValue(6, 0),
+        ],
+      );
+
+      expect(many.times, hasLength(ReminderTimes.maxPerDay));
+      expect(many.times.toSet(), hasLength(ReminderTimes.maxPerDay));
+    });
+
+    test('an empty list leaves the reminders as they were', () {
+      expect(threeADay.withTimes(const <TimeOfDayValue>[]).times, threeADay.times);
+    });
+
+    test('every one of them is listed as a reminder', () {
+      final List<DateTime> next = ReminderSchedule(threeADay)
+          .upcomingReminders(DateTime(2026, 1, 7, 9, 0), count: 4);
+
+      expect(next, <DateTime>[
+        DateTime(2026, 1, 7, 13, 30),
+        DateTime(2026, 1, 7, 21, 0),
+        DateTime(2026, 1, 8, 8, 0),
+        DateTime(2026, 1, 8, 13, 30),
+      ]);
+    });
+
+    test('are quiet until the next reading period once today’s is read', () {
+      final ReminderSchedule schedule = ReminderSchedule(threeADay);
+      final DateTime now = DateTime(2026, 1, 7, 9, 0);
+
+      final List<DateTime> next = schedule.upcomingReminders(
+        now,
+        count: 2,
+        notBefore: schedule.nextOccurrenceAfter(now),
+      );
+
+      expect(next, <DateTime>[
+        DateTime(2026, 1, 8, 8, 0),
+        DateTime(2026, 1, 8, 13, 30),
+      ]);
+    });
+
+    test('still move the reading on once a day, at the first of them', () {
+      final ReminderSchedule schedule = ReminderSchedule(threeADay);
+
+      // At 22:00 the period that began at 8:00 is still the one being read.
+      expect(
+        schedule.currentPeriodStart(DateTime(2026, 1, 7, 22, 0)),
+        DateTime(2026, 1, 7, 8, 0),
+      );
+      expect(
+        schedule.nextOccurrences(DateTime(2026, 1, 7, 9, 0), count: 2),
+        <DateTime>[DateTime(2026, 1, 8, 8, 0), DateTime(2026, 1, 9, 8, 0)],
+      );
+    });
+
+    test('follow the chosen days', () {
+      final NotificationPreferences mondays = prefs(
+        frequency: NotificationFrequency.weekly,
+        weekdays: <int>{1},
+      ).withTimes(const <TimeOfDayValue>[
+        TimeOfDayValue(8, 0),
+        TimeOfDayValue(20, 0),
+      ]);
+
+      expect(
+        ReminderSchedule(mondays)
+            .upcomingReminders(DateTime(2026, 1, 7, 9, 0), count: 3),
+        <DateTime>[
+          DateTime(2026, 1, 12, 8, 0),
+          DateTime(2026, 1, 12, 20, 0),
+          DateTime(2026, 1, 19, 8, 0),
+        ],
+      );
+    });
+  });
 }

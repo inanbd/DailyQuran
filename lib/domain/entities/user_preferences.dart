@@ -20,7 +20,12 @@ class UserPreferences {
     this.readingTrack,
     this.currentEditionId,
     this.secondaryEditionId,
+    this.dailyReadingMinutes = 0,
+    this.celebrations = true,
   });
+
+  /// The daily reading times a reader can choose from, in minutes.
+  static const List<int> readingMinuteChoices = <int>[5, 10, 15, 20, 30, 45, 60];
 
   static const UserPreferences defaults = UserPreferences(
     languageMode: LanguageMode.both,
@@ -94,6 +99,18 @@ class UserPreferences {
         ?secondaryEditionId,
       ];
 
+  /// How long the reader means to spend reading each day, in minutes, or 0
+  /// for no reading-time goal.
+  ///
+  /// Measured, never assumed: only time with an ayah on screen and the reader
+  /// evidently reading it counts (see `ReadingSession`).
+  final int dailyReadingMinutes;
+
+  /// Whether reaching a streak or a milestone is marked with a word of
+  /// congratulation. On by default; the record is kept either way, so turning
+  /// it off quiets the app without losing anything.
+  final bool celebrations;
+
   UserPreferences copyWith({
     LanguageMode? languageMode,
     bool? showTransliteration,
@@ -106,6 +123,8 @@ class UserPreferences {
     ReadingTrack? readingTrack,
     String? currentEditionId,
     String? secondaryEditionId,
+    int? dailyReadingMinutes,
+    bool? celebrations,
     /// Drops the second translation. Needed because a null
     /// [secondaryEditionId] above means "leave it alone", which would make
     /// turning the second translation back off impossible to express.
@@ -125,6 +144,8 @@ class UserPreferences {
       secondaryEditionId: clearSecondaryEdition
           ? null
           : secondaryEditionId ?? this.secondaryEditionId,
+      dailyReadingMinutes: dailyReadingMinutes ?? this.dailyReadingMinutes,
+      celebrations: celebrations ?? this.celebrations,
     );
   }
 }

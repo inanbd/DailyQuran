@@ -172,8 +172,34 @@ class ProgressDao {
         where: 'scope = ?',
         whereArgs: <Object?>[scope],
       );
+      await txn.delete(
+        AppDatabase.milestonesTable,
+        where: 'scope = ?',
+        whereArgs: <Object?>[scope],
+      );
     });
     return _read(db, scope, totalAyah);
+  }
+
+  /// Records [percent] as reached for [scope], returning whether it is new.
+  Future<bool> reachMilestone(String scope, int percent, DateTime at) async {
+    final Database db = await _database.database;
+    return db.transaction((Transaction txn) async {
+      final List<Map<String, Object?>> existing = await txn.query(
+        AppDatabase.milestonesTable,
+        columns: <String>['percent'],
+        where: 'scope = ? AND percent = ?',
+        whereArgs: <Object?>[scope, percent],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) return false;
+      await txn.insert(AppDatabase.milestonesTable, <String, Object?>{
+        'scope': scope,
+        'percent': percent,
+        'reached_at': at.millisecondsSinceEpoch,
+      });
+      return true;
+    });
   }
 
   /// Copies every read ayah and the position of [from] into [to], leaving

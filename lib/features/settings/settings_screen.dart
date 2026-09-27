@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../app/edition_providers.dart';
 import '../../app/providers.dart';
 import '../../app/routes.dart';
-import '../../core/utils/formatting.dart';
 import '../../domain/entities/notification_preferences.dart';
 import '../../domain/entities/quran_edition.dart';
 import '../../domain/entities/user_preferences.dart';
@@ -56,6 +55,13 @@ class SettingsScreen extends ConsumerWidget {
                 onTap: () => context.go(Routes.planner),
               ),
               SettingsRow(
+                label: 'Daily reading time',
+                value: SettingsLabels.readingMinutes(
+                  preferences.dailyReadingMinutes,
+                ),
+                onTap: () => context.go(Routes.settingsReading),
+              ),
+              SettingsRow(
                 label: 'Ayah text',
                 value: SettingsLabels.language(preferences.languageMode),
                 onTap: () => context.go(Routes.settingsReading),
@@ -93,10 +99,9 @@ class SettingsScreen extends ConsumerWidget {
                 onTap: () => context.go(Routes.settingsNotifications),
               ),
               SettingsRow(
-                label: 'Time',
-                value: Formatting.timeOfDay(
-                  notifications.time.hour,
-                  notifications.time.minute,
+                label: notifications.laterTimes.isEmpty ? 'Time' : 'Times',
+                value: SettingsLabels.reminderTimes(
+                  notifications.times,
                   use24Hour: use24Hour,
                 ),
                 onTap: () => context.go(Routes.settingsNotifications),

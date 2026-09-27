@@ -2,6 +2,34 @@
 
 Each version's section is published as its GitHub Release notes.
 
+## Unreleased
+
+**Reading time, streaks and several reminders a day.**
+
+- **Remind me more than once.** Set up to five reminders a day, for your Daily
+  Ayah and for your plan. The first brings your ayah; the later ones are gentle
+  nudges, and they stop once you have read. Your Daily Ayah still moves on once
+  a day.
+- **A daily reading time.** Choose 5 to 60 minutes a day under Settings →
+  Reading. The app counts the time you spend reading — only while an ayah is on
+  screen and you are with it — and shows how much of today's time is done.
+- **Your streak.** A day counts when you meet your goal: your reading time,
+  your plan's goal, or — if you have set neither — your Daily Ayah. The
+  Progress tab shows your streak, today's reading time, the last seven days,
+  and how your week compares with the one before.
+- **Congratulations when they are earned.** Every 3 days in a row, every tenth
+  of the Qur'an, when you reach your reading time, and when you read longer
+  than the day before. Each is said once. Turn them off under Settings →
+  Reading → Celebrate milestones.
+- **See how long a plan's day takes.** Each plan in the Qur'an Planner now says
+  roughly how much time a day it needs — "About 202 ayat a day · around 1 h 5
+  min" — timed for the Arabic, translation or both, whichever you read.
+- **A tidier reading screen.** The bottom tab is now **Read**, and Progress sits
+  right beside it. With a plan, **My Plan** / **Daily Ayah** sits at the top in
+  place of the title, your plan first.
+- **Fixed:** a second translation now shows under your plan's reading, not only
+  under the Daily Ayah.
+
 ## 1.2.0
 
 **The Qur'an Planner** — finish the whole Qur'an by a day you choose.

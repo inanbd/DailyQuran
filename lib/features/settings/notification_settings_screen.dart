@@ -15,6 +15,7 @@ import '../../shared/widgets/app_page.dart';
 import '../../shared/widgets/notice_banner.dart';
 import '../../shared/widgets/settings_group.dart';
 import 'reminder_permission_flow.dart';
+import 'reminder_time_rows.dart';
 import 'settings_labels.dart';
 
 /// Reminder frequency, days and time — plus an honest account of whether the
@@ -34,7 +35,6 @@ class NotificationSettingsScreen extends ConsumerWidget {
     // question that has not come back yet.
     final ReminderReadiness readiness =
         readinessAsync.value ?? ReminderReadiness.unknown;
-    final bool use24Hour = MediaQuery.alwaysUse24HourFormatOf(context);
 
     return AppPage(
       title: 'Notifications',
@@ -122,18 +122,15 @@ class NotificationSettingsScreen extends ConsumerWidget {
             ],
             const SizedBox(height: AppSpacing.xl),
             SettingsGroup(
-              title: 'Time',
-              children: <Widget>[
-                SettingsRow(
-                  label: 'Reminder time',
-                  value: Formatting.timeOfDay(
-                    preferences.time.hour,
-                    preferences.time.minute,
-                    use24Hour: use24Hour,
-                  ),
-                  onTap: () => _pickTime(context, ref, preferences),
-                ),
-              ],
+              title: preferences.laterTimes.isEmpty ? 'Time' : 'Times',
+              children: reminderTimeRows(
+                context: context,
+                times: preferences.times,
+                onChanged: (List<TimeOfDayValue> times) =>
+                    _update(ref, preferences.withTimes(times)),
+                firstNote: 'Brings your next Daily Ayah.',
+                laterNote: 'A gentle nudge — skipped once you’ve read.',
+              ),
             ),
             const SizedBox(height: AppSpacing.xl),
             _ReminderContentGroup(preferences: preferences),
@@ -175,27 +172,6 @@ class NotificationSettingsScreen extends ConsumerWidget {
     await ref.read(notificationPreferencesProvider.notifier).update(next);
   }
 
-  static Future<void> _pickTime(
-    BuildContext context,
-    WidgetRef ref,
-    NotificationPreferences preferences,
-  ) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(
-        hour: preferences.time.hour,
-        minute: preferences.time.minute,
-      ),
-      helpText: 'Reminder time',
-    );
-    if (picked == null) return;
-    await _update(
-      ref,
-      preferences.copyWith(
-        time: TimeOfDayValue(picked.hour, picked.minute),
-      ),
-    );
-  }
 }
 
 /// How much a reminder is allowed to reveal.
@@ -487,8 +463,10 @@ class _UpcomingReminders extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppColors colors = context.colors;
     final bool use24Hour = MediaQuery.alwaysUse24HourFormatOf(context);
+    // Every reminder, not just the first of each day: a reader who has just
+    // added a second wants to see it arrive.
     final List<DateTime> upcoming = ReminderSchedule(preferences)
-        .nextOccurrences(DateTime.now(), count: 3);
+        .upcomingReminders(DateTime.now(), count: 3);
 
     if (upcoming.isEmpty) {
       return Text(

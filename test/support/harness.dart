@@ -3,6 +3,7 @@ import 'package:daily_quran/app/providers.dart';
 import 'package:daily_quran/data/local/app_database.dart';
 import 'package:daily_quran/data/local/preferences_store.dart';
 import 'package:daily_quran/domain/entities/notification_preferences.dart';
+import 'package:daily_quran/domain/entities/reading_track.dart';
 import 'package:daily_quran/domain/entities/user_preferences.dart';
 import 'package:daily_quran/domain/repositories/quran_content_source.dart';
 import 'package:daily_quran/features/splash/splash_screen.dart';
@@ -49,7 +50,14 @@ class TestHarness {
     Map<String, Object> initialPreferences = const <String, Object>{},
   }) async {
     sqfliteFfiInit();
-    SharedPreferences.setMockInitialValues(initialPreferences);
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      // Off unless a test asks for them. The test editions are ten ayat long,
+      // so every ayah read is another tenth of the reading — and a sheet of
+      // congratulations over the page would stand in the way of every test
+      // that is not about congratulations.
+      'flutter.pref.celebrations': false,
+      ...initialPreferences,
+    });
 
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final PreferencesStore store = PreferencesStore(prefs);
@@ -146,6 +154,16 @@ class TestHarness {
     }
   }
 }
+
+/// The reading the switch at the top of the Today screen says is showing.
+///
+/// Only there with a plan: without one the page has its title instead.
+ReadingTrack shownTrack(WidgetTester tester) => tester
+    .widget<SegmentedButton<ReadingTrack>>(
+      find.byType(SegmentedButton<ReadingTrack>),
+    )
+    .selected
+    .single;
 
 /// Runs an action that touches the database, then rebuilds the UI.
 ///

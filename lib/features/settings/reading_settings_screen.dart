@@ -11,8 +11,9 @@ import '../../shared/widgets/app_page.dart';
 import '../../shared/widgets/settings_group.dart';
 import 'settings_labels.dart';
 
-/// Which language(s) an ayah is shown in, and whether to show a
-/// transliteration alongside the Arabic.
+/// How much time the reader means to give the Qur'an each day, whether the
+/// app congratulates them on it — and which language(s) an ayah is shown in,
+/// with or without a transliteration alongside the Arabic.
 class ReadingSettingsScreen extends ConsumerWidget {
   const ReadingSettingsScreen({super.key});
 
@@ -27,6 +28,55 @@ class ReadingSettingsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          SettingsGroup(
+            title: 'Daily reading time',
+            children: <Widget>[
+              for (final int minutes in <int>[
+                0,
+                ...UserPreferences.readingMinuteChoices,
+              ])
+                ChoiceRow<int>(
+                  label: SettingsLabels.readingMinutes(minutes),
+                  description: minutes == 0
+                      ? 'No time goal. Your streak follows your plan’s goal, '
+                          'or your Daily Ayah if you have no plan.'
+                      : null,
+                  value: minutes,
+                  groupValue: preferences.dailyReadingMinutes,
+                  onChanged: (int value) => ref
+                      .read(userPreferencesProvider.notifier)
+                      .update(preferences.copyWith(dailyReadingMinutes: value)),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Time counts while an ayah is on screen and you are reading it. '
+            'Put your phone down for a couple of minutes and the clock waits '
+            'for you.',
+            style: AppTypography.reference.copyWith(
+              color: colors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          SettingsGroup(
+            title: 'Encouragement',
+            children: <Widget>[
+              SettingsRow(
+                label: 'Celebrate milestones',
+                description: 'A word of congratulation every 3 days in a row, '
+                    'every tenth of the Qur’an, and when you reach your '
+                    'reading time or read longer than the day before.',
+                trailing: Switch(
+                  value: preferences.celebrations,
+                  onChanged: (bool value) => ref
+                      .read(userPreferencesProvider.notifier)
+                      .update(preferences.copyWith(celebrations: value)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
           SettingsGroup(
             title: 'Ayah text',
             children: <Widget>[

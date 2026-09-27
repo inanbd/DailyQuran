@@ -5,13 +5,13 @@ import 'package:sqflite/sqflite.dart';
 ///
 /// The database holds two very different kinds of data: a local *copy* of an
 /// edition's text (so reading works offline and paging 6,236 ayat is cheap) and
-/// the reader's own progress and favourites. Only the latter is irreplaceable —
-/// ayah rows can always be re-imported from the content source.
+/// the reader's own progress, favourites and reading days. Only the latter is
+/// irreplaceable — ayah rows can always be re-imported from the content source.
 class AppDatabase {
   AppDatabase({this.factoryOverride, this.pathOverride});
 
   static const String fileName = 'daily_quran.db';
-  static const int schemaVersion = 3;
+  static const int schemaVersion = 4;
 
   static const String editionsTable = 'editions';
   static const String ayahTable = 'ayah';
@@ -19,6 +19,8 @@ class AppDatabase {
   static const String progressTable = 'reading_progress';
   static const String readTable = 'read_ayah';
   static const String favouritesTable = 'favourite_ayah';
+  static const String readingDaysTable = 'reading_day';
+  static const String milestonesTable = 'milestone';
 
   /// Injected in tests to run against an in-memory FFI database.
   final DatabaseFactory? factoryOverride;
@@ -81,6 +83,13 @@ class AppDatabase {
             // so the reader's place and saved ayat survive untouched.
             await _clearIfPresent(db, ayahTable);
             await _clearIfPresent(db, surahsTable);
+          }
+          if (oldVersion < 4) {
+            // Reading time, goal days and milestones arrived. They start
+            // empty: nothing about them can be honestly reconstructed from
+            // what was stored before, so a streak begins on the first day
+            // after the update rather than being guessed at.
+            await _createActivityTables(db);
           }
         },
       ),
@@ -202,6 +211,39 @@ class AppDatabase {
     batch.execute(
       'CREATE INDEX idx_favourite_saved ON $favouritesTable (saved_at DESC)',
     );
+
+    await batch.commit(noResult: true);
+    await _createActivityTables(db);
+  }
+
+  /// The reader's reading days and the milestones their readings have passed.
+  ///
+  /// `IF NOT EXISTS` because the upgrade creates them against whatever an
+  /// install actually has, which is not always what its version says.
+  static Future<void> _createActivityTables(Database db) async {
+    final Batch batch = db.batch();
+
+    // One row per calendar day with anything to record. The day is stored as
+    // `yyyy-MM-dd` rather than a timestamp so it stays the same day whatever
+    // timezone it is read back in.
+    batch.execute('''
+      CREATE TABLE IF NOT EXISTS $readingDaysTable (
+        day TEXT PRIMARY KEY,
+        seconds INTEGER NOT NULL DEFAULT 0,
+        goal_met_at INTEGER
+      )
+    ''');
+
+    // Per scope, like the read state it is measured from, so starting a
+    // reading over clears its milestones along with it.
+    batch.execute('''
+      CREATE TABLE IF NOT EXISTS $milestonesTable (
+        scope TEXT NOT NULL,
+        percent INTEGER NOT NULL,
+        reached_at INTEGER NOT NULL,
+        PRIMARY KEY (scope, percent)
+      )
+    ''');
 
     await batch.commit(noResult: true);
   }

@@ -106,6 +106,25 @@ abstract final class SettingsLabels {
     }
   }
 
+  /// A day's reminder times as a settings-row value: the time itself when
+  /// there is one, how many when there are several — a list of five times
+  /// would not fit, and the detail screen shows them all.
+  static String reminderTimes(
+    List<TimeOfDayValue> times, {
+    required bool use24Hour,
+  }) {
+    if (times.length != 1) return '${times.length} a day';
+    return Formatting.timeOfDay(
+      times.single.hour,
+      times.single.minute,
+      use24Hour: use24Hour,
+    );
+  }
+
+  /// The daily reading time as a settings value.
+  static String readingMinutes(int minutes) =>
+      minutes <= 0 ? 'Off' : '$minutes min a day';
+
   /// Frequency including the specific days, e.g. "Selected days · Mon, Wed".
   static String frequency(NotificationPreferences preferences) {
     final String name = frequencyName(preferences.frequency);

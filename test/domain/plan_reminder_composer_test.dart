@@ -128,4 +128,77 @@ void main() {
   test('arms nothing once the Qur’an is finished', () {
     expect(compose(progress: read(100)), isEmpty);
   });
+
+  group('several times a day', () {
+    final ReadingPlan twice = month.withReminderTimes(const <TimeOfDayValue>[
+      TimeOfDayValue(7, 0),
+      TimeOfDayValue(20, 0),
+    ]);
+
+    test('arrives at each of them, every day', () {
+      final List<PlanReminder> reminders = compose(plan: twice, days: 2);
+
+      expect(reminders.map((PlanReminder it) => it.at), <DateTime>[
+        DateTime(2026, 1, 1, 7, 0),
+        DateTime(2026, 1, 1, 20, 0),
+        DateTime(2026, 1, 2, 7, 0),
+        DateTime(2026, 1, 2, 20, 0),
+      ]);
+    });
+
+    test('a later reminder says the goal is still there', () {
+      final List<PlanReminder> reminders = compose(plan: twice, days: 1);
+
+      expect(
+        reminders[0].message.body,
+        '4 ayat to read today. Tap to begin.',
+      );
+      expect(
+        reminders[1].message.body,
+        '4 ayat still to read today. There’s time yet.',
+      );
+    });
+
+    test('counts down what is left once the goal is begun', () {
+      final List<PlanReminder> reminders = compose(
+        plan: twice,
+        progress: read(1),
+        readToday: 1,
+        now: DateTime(2026, 1, 1, 9, 0),
+        days: 1,
+      );
+
+      expect(reminders.single.at, DateTime(2026, 1, 1, 20, 0));
+      expect(reminders.single.message.body, '3 ayat left of today’s goal.');
+    });
+
+    test('none of the day’s arrive once its goal is met', () {
+      final List<PlanReminder> reminders = compose(
+        plan: twice,
+        progress: read(4),
+        readToday: 4,
+        days: 2,
+      );
+
+      expect(
+        reminders.every((PlanReminder it) => it.at.day == 2),
+        isTrue,
+      );
+    });
+
+    test('never arms more than the window holds', () {
+      final ReadingPlan fiveADay = month.withReminderTimes(<TimeOfDayValue>[
+        for (int hour = 7; hour <= 21; hour += 3) TimeOfDayValue(hour, 0),
+      ]);
+
+      final List<PlanReminder> reminders = PlanReminderComposer.compose(
+        plan: fiveADay,
+        progress: read(0),
+        readToday: 0,
+        now: DateTime(2026, 1, 1, 6, 0),
+      );
+
+      expect(reminders, hasLength(PlanReminderComposer.window));
+    });
+  });
 }

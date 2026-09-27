@@ -4,6 +4,7 @@ import 'package:daily_quran/data/local/progress_dao.dart';
 import 'package:daily_quran/domain/entities/enums.dart';
 import 'package:daily_quran/domain/entities/reading_plan.dart';
 import 'package:daily_quran/domain/entities/reading_progress.dart';
+import 'package:daily_quran/domain/entities/reading_track.dart';
 import 'package:daily_quran/domain/repositories/notification_scheduler.dart';
 import 'package:daily_quran/domain/repositories/progress_repository.dart';
 import 'package:flutter/material.dart';
@@ -71,14 +72,14 @@ void main() {
     await harness.pumpApp(tester);
 
     // A plan opens on its own reading.
-    expect(find.text('Today’s Reading'), findsOneWidget);
+    expect(shownTrack(tester), ReadingTrack.plan);
     await harness.tapButton(tester, 'Mark as read');
     await harness.tapButton(tester, 'Mark as read');
     expect(find.text('2 of 100 read'), findsOneWidget);
 
     // The Daily Ayah has read nothing: it starts at the beginning.
     await switchTo(tester, harness, 'Daily Ayah');
-    expect(find.text('Today’s Ayah'), findsOneWidget);
+    expect(shownTrack(tester), ReadingTrack.daily);
     expect(find.text('Translation number 1.'), findsOneWidget);
     expect(find.text('0 of 100 read'), findsOneWidget);
     await harness.tapButton(tester, 'Mark as read');
@@ -157,7 +158,7 @@ void main() {
 
       await harness.tapButton(tester, 'Continue reading');
 
-      expect(find.text('Today’s Reading'), findsOneWidget);
+      expect(shownTrack(tester), ReadingTrack.plan);
       expect(find.text('0 of 4 ayat'), findsOneWidget);
       expect(find.text('Translation number 1.'), findsOneWidget);
     });
@@ -172,7 +173,7 @@ void main() {
         initialPreferences: withPlan(),
       );
       await harness.pumpApp(tester);
-      expect(find.text('Today’s Reading'), findsOneWidget);
+      expect(shownTrack(tester), ReadingTrack.plan);
 
       scheduler.tap(
         const QuranDeepLink(editionId: 'test_edition', kind: ReminderKind.plan),
@@ -219,7 +220,7 @@ void main() {
     );
     await harness.pumpApp(tester);
 
-    expect(find.text('Today’s Ayah'), findsOneWidget);
+    expect(shownTrack(tester), ReadingTrack.daily);
     expect(find.text('1 of 100 read'), findsOneWidget);
     expect((await progressOf(tester, harness, 'quran')).totalRead, 1);
     expect((await progressOf(tester, harness, 'quran#plan')).totalRead, 0);
@@ -251,7 +252,7 @@ void main() {
     await tester.pump();
     await tester.tap(planButton.first);
     await harness.settle(tester);
-    expect(find.text('Today’s Reading'), findsOneWidget);
+    expect(shownTrack(tester), ReadingTrack.plan);
   });
 
   testWidgets('without a plan, the Progress tab offers to make one',
@@ -296,7 +297,7 @@ void main() {
     await harness.pumpApp(tester);
 
     // The plan picks up exactly where it was, rather than at the first ayah.
-    expect(find.text('Today’s Reading'), findsOneWidget);
+    expect(shownTrack(tester), ReadingTrack.plan);
     expect(find.text('10 of 100 read'), findsOneWidget);
     expect(find.text('Translation number 11.'), findsOneWidget);
     // The Daily Ayah keeps its own copy, and the carry-over happens once.

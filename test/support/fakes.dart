@@ -181,6 +181,9 @@ class FakeNotificationScheduler implements NotificationScheduler {
   final List<List<PlanReminder>> scheduledPlanReminders =
       <List<PlanReminder>>[];
 
+  /// The quiet period each reschedule was given, most recent last.
+  final List<DateTime?> scheduledQuietUntil = <DateTime?>[];
+
   final StreamController<QuranDeepLink> _taps =
       StreamController<QuranDeepLink>.broadcast();
 
@@ -241,11 +244,13 @@ class FakeNotificationScheduler implements NotificationScheduler {
     required String? editionId,
     ReminderMessage message = ReminderMessage.invitation,
     List<PlanReminder> planReminders = const <PlanReminder>[],
+    DateTime? quietUntil,
   }) async {
     scheduledPreferences.add(preferences);
     scheduledEditionIds.add(editionId);
     scheduledMessages.add(message);
     scheduledPlanReminders.add(planReminders);
+    scheduledQuietUntil.add(quietUntil);
   }
 
   @override

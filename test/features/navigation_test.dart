@@ -114,9 +114,42 @@ void main() {
     await harness.settle(tester);
     expect(find.byType(SettingsScreen), findsOneWidget);
 
-    await tester.tap(find.text('Today'));
+    await tester.tap(find.text('Read'));
     await harness.settle(tester);
     expect(find.byType(TodayScreen), findsOneWidget);
+  });
+
+  testWidgets('the tabs run Read, Progress, Library, Favourites, Settings',
+      (WidgetTester tester) async {
+    final TestHarness harness = await TestHarness.create(
+      initialPreferences: onboarded(),
+    );
+    await harness.pumpApp(tester);
+
+    final List<String> labels = <String>[
+      'Read',
+      'Progress',
+      'Library',
+      'Favourites',
+      'Settings',
+    ];
+    final List<double> positions = <double>[
+      for (final String label in labels)
+        tester
+            .getCenter(
+              find.descendant(
+                of: find.byType(NavigationBar),
+                matching: find.text(label),
+              ),
+            )
+            .dx,
+    ];
+    expect(positions, orderedEquals(<double>[...positions]..sort()));
+
+    // The second tab is the one that opens Progress.
+    await tester.tap(find.text('Progress'));
+    await harness.settle(tester);
+    expect(find.byType(ProgressScreen), findsOneWidget);
   });
 
   testWidgets('renders in dark mode at the largest text size',

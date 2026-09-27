@@ -16,11 +16,16 @@ import '../../shared/theme/app_typography.dart';
 import '../../shared/widgets/app_page.dart';
 import '../../shared/widgets/progress_bar.dart';
 import '../../shared/widgets/state_views.dart';
+import '../activity/activity_widgets.dart';
 import '../planner/plan_status.dart';
 import '../planner/planner_widgets.dart';
 import '../today/today_controller.dart';
 
-/// Reading progress. Deliberately not a streak dashboard.
+/// Reading progress: the reader's own reading first — their streak and time
+/// spent reading — then the two readings of the Qur'an.
+///
+/// The streak is there to encourage, never to scold: it counts up, and a
+/// missed day simply starts it again without comment.
 ///
 /// The reader's two readings are kept apart here as everywhere else: the plan,
 /// with today's goal, and the Daily Ayah. Each has its own way back in.
@@ -51,6 +56,10 @@ class ProgressScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               if (hasEdition) ...<Widget>[
+                const OrnateHeading('Your reading'),
+                const SizedBox(height: AppSpacing.md),
+                const ReadingSummaryCard(),
+                const SizedBox(height: AppSpacing.xxl),
                 const OrnateHeading('My plan'),
                 const SizedBox(height: AppSpacing.md),
                 if (plan != null)

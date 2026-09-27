@@ -93,6 +93,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulNavigationShell navigationShell,
         ) =>
             AppShell(navigationShell: navigationShell),
+        // Branch order is tab order — Read, Progress, Library, Favourites,
+        // Settings — because the shell selects branches by index. See
+        // AppShell.
         branches: <StatefulShellBranch>[
           StatefulShellBranch(
             routes: <RouteBase>[
@@ -100,6 +103,22 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                 path: Routes.today,
                 builder: (BuildContext context, GoRouterState state) =>
                     const TodayScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.progress,
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ProgressScreen(),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'plan',
+                    builder: (BuildContext context, GoRouterState state) =>
+                        const PlannerScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -127,22 +146,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                 path: Routes.favourites,
                 builder: (BuildContext context, GoRouterState state) =>
                     const FavouritesScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: Routes.progress,
-                builder: (BuildContext context, GoRouterState state) =>
-                    const ProgressScreen(),
-                routes: <RouteBase>[
-                  GoRoute(
-                    path: 'plan',
-                    builder: (BuildContext context, GoRouterState state) =>
-                        const PlannerScreen(),
-                  ),
-                ],
               ),
             ],
           ),

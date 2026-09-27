@@ -3,7 +3,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../shared/theme/app_colors.dart';
 
-/// The five-tab frame: Today, Library, Favourites, Progress, Settings.
+/// The five-tab frame: Read, Progress, Library, Favourites, Settings.
+///
+/// Progress sits beside the reading because it is where a reader goes next:
+/// their streak, their plan, how far through the Qur'an they are.
 ///
 /// Tab order here must match the branch order in the router: the shell
 /// selects branches by index, not by route.
@@ -30,10 +33,17 @@ class AppShell extends StatelessWidget {
           selectedIndex: navigationShell.currentIndex,
           onDestinationSelected: _onTap,
           destinations: const <NavigationDestination>[
+            // The reading itself — the Daily Ayah or the plan, whichever is
+            // on — so named for what the reader comes to do, not for a day.
             NavigationDestination(
               icon: Icon(Icons.menu_book_outlined),
               selectedIcon: Icon(Icons.menu_book),
-              label: 'Today',
+              label: 'Read',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.donut_large_outlined),
+              selectedIcon: Icon(Icons.donut_large),
+              label: 'Progress',
             ),
             NavigationDestination(
               icon: Icon(Icons.library_books_outlined),
@@ -44,11 +54,6 @@ class AppShell extends StatelessWidget {
               icon: Icon(Icons.favorite_border),
               selectedIcon: Icon(Icons.favorite),
               label: 'Favourites',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.donut_large_outlined),
-              selectedIcon: Icon(Icons.donut_large),
-              label: 'Progress',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),

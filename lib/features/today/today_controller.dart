@@ -16,6 +16,7 @@ import '../../domain/repositories/quran_repository.dart';
 import '../../domain/services/plan_scheduler.dart';
 import '../../domain/services/reading_scheduler.dart';
 import '../../domain/services/reminder_schedule.dart';
+import '../activity/reading_activity.dart';
 
 /// What the Today screen renders.
 @immutable
@@ -176,11 +177,14 @@ class TodayController extends AsyncNotifier<TodayState> {
     final bool isRead =
         ayah != null && await progressRepository.isRead(scope, ayah.verseKey);
 
+    // Matched on the edition's own scope, not the reading's: the plan reads
+    // under a scope of its own, but it is the same ayat in the same order as
+    // the translation beneath it.
     final (QuranEdition?, Ayah?) second = await _loadSecond(
       quranRepository: quranRepository,
       secondaryId: preferences.secondaryEditionId,
       primaryId: editionId,
-      scope: scope,
+      editionScope: edition.scope,
       ordinal: ordinal,
     );
 
@@ -207,7 +211,7 @@ class TodayController extends AsyncNotifier<TodayState> {
     required QuranRepository quranRepository,
     required String? secondaryId,
     required String primaryId,
-    required String scope,
+    required String editionScope,
     required int ordinal,
   }) async {
     if (secondaryId == null || secondaryId == primaryId) {
@@ -219,7 +223,7 @@ class TodayController extends AsyncNotifier<TodayState> {
       // Ordinals only line up between editions counting the same ayat. Anything
       // else would put an unrelated ayah under this one, which is worse than
       // showing no second translation at all.
-      if (second.scope != scope) return (null, null);
+      if (second.scope != editionScope) return (null, null);
       return (second, await quranRepository.ayahAt(secondaryId, ordinal));
     } on AppException {
       return (null, null);
@@ -259,8 +263,9 @@ class TodayController extends AsyncNotifier<TodayState> {
     // Only the reading on screen is marked: an ayah read in the plan does not
     // count as the Daily Ayah, nor the other way round.
     final ProgressRepository repository = ref.read(progressRepositoryProvider);
+    ReadingProgress? readTo;
     if (read) {
-      await repository.markRead(
+      readTo = await repository.markRead(
         scope,
         ayah.verseKey,
         ayah.ordinal,
@@ -282,6 +287,18 @@ class TodayController extends AsyncNotifier<TodayState> {
     _invalidateProgressViews();
     ref.invalidateSelf();
     await future;
+
+    // Once the page shows the ayah as read, so any word about it lands on
+    // top of the reading it is about.
+    final ReadingProgress? readFrom = current!.progress;
+    if (readTo != null && readFrom != null) {
+      await ref.read(readingActivityProvider).ayahRead(
+            edition: edition,
+            track: current.track,
+            before: readFrom,
+            after: readTo,
+          );
+    }
   }
 
   /// Marks today's ayah read because the reader arrived from a reminder.
@@ -392,6 +409,7 @@ class TodayController extends AsyncNotifier<TodayState> {
               // new plan keeps the ones they already chose.
               reminderEnabled: _plan.reminderEnabled,
               reminderTime: _plan.reminderTime,
+              laterReminderTimes: _plan.laterReminderTimes,
               needsTrackSeed: false,
             ),
             // Choosing a plan is choosing to read it.
@@ -440,6 +458,10 @@ class TodayController extends AsyncNotifier<TodayState> {
   /// Turns the plan's own reminder on or off, or moves it.
   Future<void> setPlanReminder({bool? enabled, TimeOfDayValue? time}) =>
       _savePlan(_plan.copyWith(reminderEnabled: enabled, reminderTime: time));
+
+  /// Sets every time of day the plan's reminder arrives, the earliest first.
+  Future<void> setPlanReminderTimes(List<TimeOfDayValue> times) =>
+      _savePlan(_plan.withReminderTimes(times));
 
   /// Clears the plan's reading for the edition open.
   Future<void> _resetPlanReading() async {

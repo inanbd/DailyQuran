@@ -46,8 +46,16 @@ abstract interface class ProgressRepository {
   /// portion for the current period is done.
   Future<int> readCountSince(String scope, DateTime since);
 
-  /// Clears all read state for a scope so it can be read again.
+  /// Clears all read state for a scope so it can be read again, milestones
+  /// included — a reading begun again passes each of them afresh.
   Future<ReadingProgress> resetScope(String scope, int totalAyah);
+
+  /// Records that [percent]% of [scope] has been read.
+  ///
+  /// Returns true only the first time, so a milestone is congratulated once
+  /// however often the reading dips under it and climbs back — an ayah marked
+  /// unread and read again is not a new achievement.
+  Future<bool> reachMilestone(String scope, int percent, DateTime at);
 
   /// Copies [from]'s read state and position into [to], keeping anything [to]
   /// already has.

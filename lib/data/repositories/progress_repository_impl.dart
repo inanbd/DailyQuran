@@ -65,4 +65,8 @@ class ProgressRepositoryImpl implements ProgressRepository {
 
   @override
   Future<void> copyScope(String from, String to) => _dao.copyScope(from, to);
+
+  @override
+  Future<bool> reachMilestone(String scope, int percent, DateTime at) =>
+      _dao.reachMilestone(scope, percent, at);
 }

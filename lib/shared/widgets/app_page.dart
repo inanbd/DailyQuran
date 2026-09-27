@@ -10,6 +10,7 @@ class AppPage extends StatelessWidget {
   const AppPage({
     required this.title,
     required this.child,
+    this.heading,
     this.subtitle,
     this.actions,
     this.showBackButton = false,
@@ -19,6 +20,10 @@ class AppPage extends StatelessWidget {
   });
 
   final String title;
+
+  /// Shown in the title's place when given — for a page whose top is a
+  /// control rather than a name, like the choice between two readings.
+  final Widget? heading;
   final String? subtitle;
   final Widget child;
   final List<Widget>? actions;
@@ -60,14 +65,15 @@ class AppPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Semantics(
-                  header: true,
-                  child: Text(
-                    title,
-                    style: AppTypography.pageTitle
-                        .copyWith(color: colors.textPrimary),
-                  ),
-                ),
+                heading ??
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        title,
+                        style: AppTypography.pageTitle
+                            .copyWith(color: colors.textPrimary),
+                      ),
+                    ),
                 if (subtitle != null) ...<Widget>[
                   const SizedBox(height: AppSpacing.xs),
                   Text(

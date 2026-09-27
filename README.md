@@ -1,12 +1,13 @@
 # Daily Quran
 
-A quiet reading app: one ayah at a time, one gentle reminder, steady progress.
+A quiet reading app: one ayah at a time, gentle reminders, steady progress.
 
 You choose a translation — seven ship with the app, in six languages — choose
 when you want to be reminded and how much you want to read, and work through the
 Qur'an in order. Your place is saved and follows you from one translation to
 another, nothing is marked read unless you read it, and the whole reading
-experience works offline. No account, no feed, no streaks.
+experience works offline. No account, no feed. There is a streak, but it only
+ever counts up and praises: a missed day starts it again without a word.
 
 ---
 
@@ -14,6 +15,7 @@ experience works offline. No account, no feed, no streaks.
 
 - [Reading model](#reading-model)
 - [The Qur'an Planner](#the-quran-planner)
+- [Reading time, streaks and milestones](#reading-time-streaks-and-milestones)
 - [Qur'an text and source integrity](#quran-text-and-source-integrity)
 - [Choosing a translation](#choosing-a-translation)
 - [Word-by-word tarjama](#word-by-word-tarjama)
@@ -111,9 +113,18 @@ Planner** (also reachable from Settings):
 
 | Plan | What it works out to |
 |---|---|
-| **Finish in 1 month** | About 202 ayat a day |
-| **Finish in 1 year** | About 18 ayat a day |
+| **Finish in 1 month** | About 202 ayat a day · around 1 h 5 min |
+| **Finish in 1 year** | About 18 ayat a day · around 6 min |
 | **Pick a finish date** | Whatever your date works out to — picked on a calendar, up to five years out |
+
+Each choice also says roughly how long a day of it takes, timed for what is on
+the reader's screen: about 12 seconds an ayah for the Arabic and 8 for each
+translation, so 20 for the Arabic with one translation. Those are the Qur'an's
+own averages, measured over the bundled editions — 12.4 Arabic words an ayah
+and 20 to 33 words of translation — at the pace of a measured recitation
+(about 65 words a minute) and ordinary reading (about 200). The planner says
+plainly that it is a rough guide. See
+[`ReadingPace`](lib/domain/services/reading_pace.dart).
 
 With no plan, the app is what it always was: the Daily Ayah, one ayah a
 reading period.
@@ -128,8 +139,10 @@ only number on it.
 
 A plan is read on its own track, separate from the Daily Ayah. Each has its
 own place in the Qur'an and its own record of what has been read, so reading
-one never counts towards — or against — the other. The Today screen switches
-between them with **Daily Ayah** / **My Plan**; the Progress tab shows both.
+one never counts towards — or against — the other. The **Read** tab switches
+between them with **My Plan** / **Daily Ayah**, which takes the place of the
+page title; the Progress tab shows both. A second translation shows beneath
+either reading.
 
 Under the hood a track is just a progress scope: the Daily Ayah keeps the
 edition's own scope (`quran`), where every reader's existing progress already
@@ -141,15 +154,17 @@ once at startup (`carryOverLegacyPlan`), so an update never sets it back.
 ### Today's goal, first
 
 A plan has its own daily reminder (on by default, 7:00 AM, changeable in the
-planner). Each reminder carries that day's goal — "202 ayat to read today" —
-and tapping it opens **Today's goal**: how much to read, how much is done,
-where the reading picks up, and how the plan is going, with one **Continue
-reading** button. Nothing is marked read by opening it.
+planner, and up to five times a day). Each reminder carries that day's goal —
+"202 ayat to read today" — and tapping it opens **Today's goal**: how much to
+read, how much is done, where the reading picks up, and how the plan is going,
+with one **Continue reading** button. Nothing is marked read by opening it. A
+later reminder on the same day says what is left of the goal — "150 ayat left
+of today's goal".
 
 Because the goal changes from day to day, the plan's reminders are armed one
-day at a time — a rolling window of 30, re-armed whenever the app is used —
+at a time — a rolling window of 28, re-armed whenever the app is used —
 rather than as one repeating alarm, each with the goal as it will stand that
-day. A day whose goal is already met gets no reminder. See
+day. A day whose goal is already met gets no more reminders. See
 [`PlanReminderComposer`](lib/domain/services/plan_reminder_composer.dart).
 
 The Daily Ayah's reminder is unchanged: tapping it opens the Daily Ayah and
@@ -171,7 +186,7 @@ simply
 
 recomputed every day, so it grows on its own and the date holds. Reading extra
 does the opposite: every day after gets lighter. There is no backlog written
-down anywhere, nothing to "clear", and no streak to break.
+down anywhere and nothing to "clear".
 
 Two guard rails stop that arithmetic turning cruel:
 
@@ -195,6 +210,77 @@ The arithmetic is pure Dart in
 [`lib/domain/services/plan_scheduler.dart`](lib/domain/services/plan_scheduler.dart)
 and covered directly by
 [`test/domain/plan_scheduler_test.dart`](test/domain/plan_scheduler_test.dart).
+
+## Reading time, streaks and milestones
+
+The app notices when a reader keeps at it, and says so. It only ever praises:
+nothing remarks on a missed day, a shorter reading or a streak that ended.
+
+### Reading time
+
+Under **Settings → Reading → Daily reading time** a reader can set a goal of
+5 to 60 minutes a day. Time is measured, never assumed:
+
+- It counts only while an ayah is on the reading screen, the app is in the
+  foreground and the Read tab is the one showing.
+- It counts for at most two minutes past the reader's last touch, scroll or
+  page turn. A phone left open on the page overnight is not eight hours of
+  reading; the clock stops where it was fair to assume they stopped, and starts
+  again at the next touch.
+- A reading that runs past midnight counts towards both days, each for its own
+  part.
+
+The measuring is pure Dart in
+[`ReadingSession`](lib/domain/services/reading_session.dart); the Today screen
+feeds it through [`ReadingTimer`](lib/features/activity/reading_timer.dart).
+Time is kept per calendar day in the `reading_day` table.
+
+With a goal set, the Today screen shows a thin bar for it ("Reading time · 4 of
+10 min today"). The **Progress** tab shows the streak, today's and the last seven
+days' reading time, and the week against the week before: "Up 15 min on the
+week before. MashaAllah — keep it up." A shorter week gets the plain figure and
+nothing else.
+
+### The streak
+
+A day counts towards the streak when the reader **meets the goal they set**:
+
+| Goals set | The day counts when… |
+|---|---|
+| A reading time | they read for that long |
+| A plan | they meet the plan's goal for the day |
+| Both | they do either |
+| Neither | they read the Daily Ayah |
+
+A bigger goal, once chosen, replaces the Daily Ayah: reading one ayah on a day
+that asks for two hundred is not meeting the day. A day's goal is met once and
+kept — marking an ayah back as unread, or changing the goal later that day, does
+not take the day back. Streaks begin with this version; nothing is
+reconstructed from before it. See
+[`DailyGoal` and `ReadingStreak`](lib/domain/services/daily_goal.dart).
+
+### What is congratulated
+
+| When | Says |
+|---|---|
+| Every 3 days in a row of meeting the goal | "3 days in a row" |
+| Every tenth of the Qur'an, on either reading | "30% of the Qur'an" |
+| The day's reading time reached | "Today's reading time is done" |
+| More reading today than yesterday (when yesterday had at least a minute) | "Longer than yesterday" |
+
+Each is said once, at the moment it is earned: every check compares the reading
+just before something happened with the reading just after, and speaks only when
+a line was crossed. A milestone is also recorded (the `milestone` table), so a
+tenth passed, un-read and read again is not a new one; starting a reading over
+clears its milestones along with its progress. Finishing the Qur'an keeps its
+own completion screen rather than a hundredth congratulation on top of it.
+Several earned at once share one sheet. See
+[`Encouragement`](lib/domain/services/encouragement.dart) and
+[`ReadingActivity`](lib/features/activity/reading_activity.dart).
+
+**Settings → Reading → Celebrate milestones** turns the congratulations off.
+Everything is still recorded, so the Progress tab is unchanged and turning them
+back on loses nothing.
 
 ## Qur'an text and source integrity
 
@@ -365,10 +451,13 @@ lib/
   domain/
     entities/     Editions, ayat, surahs, progress, plans, preferences
     repositories/ Abstract contracts
-    services/     Reminder maths, the reading rule, plan goals and
-                  reminder text (all pure Dart)
+    services/     Reminder maths, the reading rule, plan goals, reading
+                  time, streaks, congratulations and reminder text
+                  (all pure Dart)
   features/
     onboarding/ library/ progress/ settings/ shell/ splash/
+    activity/   Reading time on the Today screen, the streak and week on
+                Progress, the congratulation sheet
     planner/    The Qur'an Planner, today's goal screen, the plan's status
     today/      Reading surface, surah index, translation chooser,
                 auto-marking, swipe
@@ -455,10 +544,20 @@ Some deliberate choices:
 - **Times are wall-clock.** 8:00 AM is resolved against the device's *current*
   timezone every time reminders are armed, so travel and daylight-saving changes
   are handled without the reader doing anything.
+- **Up to five reminders a day.** The first of the day brings the next Daily
+  Ayah — it is where the reading period starts, so three reminders still mean
+  one ayah a day. The later ones are nudges back to that same ayah, and once it
+  has been read they fall quiet until the next period
+  (`NotificationScheduler.reschedule(quietUntil:)`).
 - **Daily, weekly and selected-day cadences are armed as OS-level repeating
-  notifications**, so they survive a device restart and an app update without
-  the app running. Every-other-day has no repeating equivalent, so a rolling
+  notifications**, one per reminder time, so they survive a device restart and
+  an app update without the app running. Quietening the rest of a day is done
+  by arming each repeating reminder to *start* at its first occurrence after
+  the quiet period. Every-other-day has no repeating equivalent, so a rolling
   window of occurrences is armed and topped up on each launch.
+- **The 64-notification limit on iOS holds.** Five times on each of seven
+  selected days is 35 repeating reminders; a plan's rolling window is kept to
+  28 so the two together stay under it.
 - **Reminders are re-armed on every launch** (`bootstrapProvider`), which also
   covers timezone changes and frequency edits.
 - **Changing any setting cancels everything and re-arms**, so a stale reminder
@@ -620,8 +719,8 @@ Every release after that installs over the last.
 ## Privacy
 
 No account, no analytics, no advertising SDK, no location or contacts access.
-Reading progress, favourites, plans and preferences stay in local storage on the
-device. Every permission the app asks for serves reminders — notifications,
+Reading progress, favourites, plans, reading time and preferences stay in local
+storage on the device. Every permission the app asks for serves reminders — notifications,
 exact alarms, and an exemption from battery optimisation — and none is requested
 until the reader has chosen a reminder time. Declining any of them costs
 punctuality, nothing else.

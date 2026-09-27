@@ -35,9 +35,9 @@ abstract final class Routes {
   /// Tab order for the bottom navigation bar.
   static const List<String> tabs = <String>[
     today,
+    progress,
     library,
     favourites,
-    progress,
     settings,
   ];
 }

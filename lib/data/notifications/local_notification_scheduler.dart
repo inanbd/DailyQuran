@@ -32,9 +32,14 @@ void notificationBackgroundHandler(NotificationResponse response) {
 /// keeps 8:00 AM at 8:00 AM.
 ///
 /// Daily, weekly and selected-day cadences are armed as OS-level repeating
-/// notifications, which survive reboots and app updates without the app
-/// running. Every-other-day has no repeating equivalent, so a rolling window of
-/// concrete occurrences is armed instead and topped up on each app start.
+/// notifications — one per reminder time of the day — which survive reboots
+/// and app updates without the app running. Every-other-day has no repeating
+/// equivalent, so a rolling window of concrete occurrences is armed instead and
+/// topped up on each app start.
+///
+/// Once the day's ayah has been read, a repeating reminder is simply armed to
+/// *start* at its next occurrence after the quiet period, rather than now: it
+/// skips the rest of today and carries on repeating from there.
 ///
 /// ## How reminders stay punctual
 ///
@@ -70,17 +75,17 @@ class LocalNotificationScheduler implements NotificationScheduler {
   static const String planChannelDescription =
       'Your reading plan’s goal for the day.';
 
-  /// Id of the single repeating daily reminder.
-  static const int _dailyId = 1000;
-
-  /// Weekly / selected-day reminders occupy 1001-1007 (one per ISO weekday).
-  static const int _weekdayIdBase = 1000;
+  /// Repeating reminders occupy 1000-1047: ten ids for each of the day's
+  /// reminder times, the first of them for a daily reminder and the next seven
+  /// for weekly / selected-day ones (one per ISO weekday).
+  static const int _repeatingIdBase = 1000;
+  static const int _idsPerTime = 10;
 
   /// Every-other-day occurrences occupy 1100 upwards.
   static const int _intervalIdBase = 1100;
 
-  /// How many every-other-day occurrences to keep armed — roughly two months,
-  /// re-armed whenever the app runs.
+  /// How many every-other-day reminders to keep armed — roughly two months at
+  /// one a day, fewer days at more — re-armed whenever the app runs.
   static const int _intervalWindow = 30;
 
   /// A plan's day-by-day reminders occupy 2000 upwards.
@@ -262,6 +267,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
     required String? editionId,
     ReminderMessage message = ReminderMessage.invitation,
     List<PlanReminder> planReminders = const <PlanReminder>[],
+    DateTime? quietUntil,
   }) async {
     await initialize();
     // Re-resolve the device zone: this is the moment a timezone change or a
@@ -299,36 +305,49 @@ class LocalNotificationScheduler implements NotificationScheduler {
 
     if (!preferences.enabled) return;
 
+    final List<TimeOfDayValue> times = preferences.times;
     switch (preferences.frequency) {
       case NotificationFrequency.daily:
-        await _scheduleRepeating(
-          id: _dailyId,
-          first: _nextInstanceOfTime(preferences.time),
-          match: DateTimeComponents.time,
-          mode: mode,
-          title: title,
-          body: body,
-          payload: payload,
-        );
-      case NotificationFrequency.selectedDays:
-      case NotificationFrequency.weekly:
-        final Set<int> weekdays = ReminderSchedule(preferences).activeWeekdays;
-        for (final int weekday in weekdays) {
+        for (int slot = 0; slot < times.length; slot++) {
           await _scheduleRepeating(
-            id: _weekdayIdBase + weekday,
-            first: _nextInstanceOfWeekday(weekday, preferences.time),
-            match: DateTimeComponents.dayOfWeekAndTime,
+            id: _repeatingIdBase + slot * _idsPerTime,
+            first: _nextInstanceOfTime(times[slot], notBefore: quietUntil),
+            match: DateTimeComponents.time,
             mode: mode,
             title: title,
             body: body,
             payload: payload,
           );
         }
+      case NotificationFrequency.selectedDays:
+      case NotificationFrequency.weekly:
+        final Set<int> weekdays = ReminderSchedule(preferences).activeWeekdays;
+        for (int slot = 0; slot < times.length; slot++) {
+          for (final int weekday in weekdays) {
+            await _scheduleRepeating(
+              id: _repeatingIdBase + slot * _idsPerTime + weekday,
+              first: _nextInstanceOfWeekday(
+                weekday,
+                times[slot],
+                notBefore: quietUntil,
+              ),
+              match: DateTimeComponents.dayOfWeekAndTime,
+              mode: mode,
+              title: title,
+              body: body,
+              payload: payload,
+            );
+          }
+        }
       case NotificationFrequency.everyOtherDay:
         // No repeating rule matches "every other day", so a window of concrete
         // occurrences is armed and topped up whenever the app runs.
-        final List<DateTime> occurrences = ReminderSchedule(preferences)
-            .nextOccurrences(DateTime.now(), count: _intervalWindow);
+        final List<DateTime> occurrences =
+            ReminderSchedule(preferences).upcomingReminders(
+          DateTime.now(),
+          count: _intervalWindow,
+          notBefore: quietUntil,
+        );
         for (int index = 0; index < occurrences.length; index++) {
           await _scheduleRepeating(
             id: _intervalIdBase + index,
@@ -496,7 +515,14 @@ class LocalNotificationScheduler implements NotificationScheduler {
         value.minute,
       );
 
-  static tz.TZDateTime _nextInstanceOfTime(TimeOfDayValue time) {
+  /// The next [time] from now, and not before [notBefore] when that is given.
+  ///
+  /// [notBefore] is a wall-clock moment, compared field by field rather than
+  /// as an instant, for the same reason reminder times are stored that way.
+  static tz.TZDateTime _nextInstanceOfTime(
+    TimeOfDayValue time, {
+    DateTime? notBefore,
+  }) {
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
     tz.TZDateTime scheduled = tz.TZDateTime(
       tz.local,
@@ -506,7 +532,12 @@ class LocalNotificationScheduler implements NotificationScheduler {
       time.hour,
       time.minute,
     );
-    if (!scheduled.isAfter(now)) {
+    // Bounded: a quiet period is never more than a week or so long, but a
+    // corrupt one must not spin here.
+    for (int guard = 0; guard < 400; guard++) {
+      final bool quiet =
+          notBefore != null && _wallClock(scheduled).isBefore(notBefore);
+      if (scheduled.isAfter(now) && !quiet) break;
       scheduled = _plusDays(scheduled, 1);
     }
     return scheduled;
@@ -514,14 +545,23 @@ class LocalNotificationScheduler implements NotificationScheduler {
 
   static tz.TZDateTime _nextInstanceOfWeekday(
     int weekday,
-    TimeOfDayValue time,
-  ) {
-    tz.TZDateTime scheduled = _nextInstanceOfTime(time);
+    TimeOfDayValue time, {
+    DateTime? notBefore,
+  }) {
+    tz.TZDateTime scheduled = _nextInstanceOfTime(time, notBefore: notBefore);
     while (scheduled.weekday != weekday) {
       scheduled = _plusDays(scheduled, 1);
     }
     return scheduled;
   }
+
+  static DateTime _wallClock(tz.TZDateTime value) => DateTime(
+        value.year,
+        value.month,
+        value.day,
+        value.hour,
+        value.minute,
+      );
 
   /// Adds whole calendar days while holding the wall-clock time steady.
   ///

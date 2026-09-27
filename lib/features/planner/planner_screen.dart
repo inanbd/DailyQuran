@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../app/routes.dart';
 import '../../core/utils/formatting.dart';
-import '../../domain/entities/notification_preferences.dart';
 import '../../domain/entities/reading_plan.dart';
+import '../../domain/entities/user_preferences.dart';
 import '../../domain/repositories/notification_scheduler.dart';
+import '../../domain/services/encouragement.dart';
+import '../../domain/services/reading_pace.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
 import '../../shared/theme/app_typography.dart';
@@ -15,6 +17,7 @@ import '../../shared/widgets/app_page.dart';
 import '../../shared/widgets/settings_group.dart';
 import '../../shared/widgets/state_views.dart';
 import '../settings/reminder_permission_flow.dart';
+import '../settings/reminder_time_rows.dart';
 import '../today/today_controller.dart';
 import 'plan_status.dart';
 import 'planner_widgets.dart';
@@ -142,7 +145,8 @@ class _TodayCard extends ConsumerWidget {
   }
 }
 
-/// The plan's own daily reminder: on or off, and when.
+/// The plan's own daily reminder: on or off, and when — as many times a day
+/// as the reader wants, up to five.
 class _PlanReminder extends ConsumerWidget {
   const _PlanReminder({required this.plan});
 
@@ -151,7 +155,6 @@ class _PlanReminder extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppColors colors = context.colors;
-    final bool use24Hour = MediaQuery.alwaysUse24HourFormatOf(context);
     final bool blocked =
         ref.watch(reminderReadinessProvider).value?.isBlocked ?? false;
     final TodayController controller =
@@ -175,14 +178,12 @@ class _PlanReminder extends ConsumerWidget {
               ),
             ),
             if (plan.reminderEnabled)
-              SettingsRow(
-                label: 'Time',
-                value: Formatting.timeOfDay(
-                  plan.reminderTime.hour,
-                  plan.reminderTime.minute,
-                  use24Hour: use24Hour,
-                ),
-                onTap: () => _pickTime(context, controller),
+              ...reminderTimeRows(
+                context: context,
+                times: plan.reminderTimes,
+                onChanged: controller.setPlanReminderTimes,
+                firstNote: 'Today’s goal.',
+                laterNote: 'What is left of it — skipped once it is met.',
               ),
           ],
         ),
@@ -205,23 +206,6 @@ class _PlanReminder extends ConsumerWidget {
     );
   }
 
-  Future<void> _pickTime(
-    BuildContext context,
-    TodayController controller,
-  ) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(
-        hour: plan.reminderTime.hour,
-        minute: plan.reminderTime.minute,
-      ),
-      helpText: 'Plan reminder time',
-    );
-    if (picked == null) return;
-    await controller.setPlanReminder(
-      time: TimeOfDayValue(picked.hour, picked.minute),
-    );
-  }
 }
 
 /// Plan again from today, start from the first ayah, or stop the plan.
@@ -385,12 +369,20 @@ class _PlanChoices extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bool custom = plan.kind == ReadingPlanKind.custom;
+    final UserPreferences preferences = ref.watch(userPreferencesProvider);
+    // Timed for what is actually on the reader's screen: the Arabic, the
+    // translation, or both — and a second translation when there is one.
+    final int pace = ReadingPace.secondsPerAyah(
+      preferences.languageMode,
+      secondTranslation: preferences.secondaryEditionId != null,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _ChoiceCard(
           title: PlanLabels.month,
-          subtitle: _datedSubtitle(ReadingPlanKind.oneMonth),
+          subtitle: _datedSubtitle(ReadingPlanKind.oneMonth, pace),
           icon: Icons.calendar_view_month,
           selected: plan.kind == ReadingPlanKind.oneMonth,
           onTap: () => _choose(context, ref, ReadingPlanKind.oneMonth),
@@ -398,7 +390,7 @@ class _PlanChoices extends ConsumerWidget {
         const SizedBox(height: AppSpacing.sm),
         _ChoiceCard(
           title: PlanLabels.year,
-          subtitle: _datedSubtitle(ReadingPlanKind.oneYear),
+          subtitle: _datedSubtitle(ReadingPlanKind.oneYear, pace),
           icon: Icons.calendar_today,
           selected: plan.kind == ReadingPlanKind.oneYear,
           onTap: () => _choose(context, ref, ReadingPlanKind.oneYear),
@@ -406,42 +398,52 @@ class _PlanChoices extends ConsumerWidget {
         const SizedBox(height: AppSpacing.sm),
         _ChoiceCard(
           title: PlanLabels.custom,
-          subtitle: _customSubtitle(),
+          subtitle: _customSubtitle(pace),
           icon: Icons.edit_calendar_outlined,
           selected: custom,
           // Tapping the chosen-date plan again is how its date is changed.
           actionHint: custom ? 'Change date' : null,
           onTap: () => _chooseDate(context, ref),
         ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'Times are a rough guide, at about $pace seconds an ayah — '
+          'yours will depend on how you like to read.',
+          style: AppTypography.reference.copyWith(
+            color: context.colors.textSecondary,
+          ),
+        ),
       ],
     );
   }
 
-  /// "Finish by Feb 6, 2026" over "About 202 ayat a day".
+  /// "Finish by Feb 6, 2026" over "About 202 ayat a day · around 1 h 10 min".
   ///
   /// The plan already running is described as it runs — its own finish date
   /// and rate — while the others say what they would be if chosen today.
-  String _datedSubtitle(ReadingPlanKind kind) {
+  String _datedSubtitle(ReadingPlanKind kind, int pace) {
     final ReadingPlan candidate = plan.kind == kind
         ? plan
         : ReadingPlan(kind: kind, startedOn: now);
-    return _describe(candidate);
+    return _describe(candidate, pace);
   }
 
-  String _customSubtitle() {
+  String _customSubtitle(int pace) {
     if (plan.kind != ReadingPlanKind.custom || plan.targetDate == null) {
       return 'Choose the day you want to finish.';
     }
-    return _describe(plan);
+    return _describe(plan, pace);
   }
 
-  String _describe(ReadingPlan candidate) {
+  String _describe(ReadingPlan candidate, int pace) {
     final DateTime start = candidate.startedOn ?? now;
     final DateTime finish = candidate.deadlineFrom(start)!;
     final int? rate = candidate.nominalPerDay(total, today: now);
     final String by = 'Finish by ${Formatting.date(finish)}';
     if (rate == null) return by;
-    return '$by\nAbout ${ayatCount(rate)} a day';
+    final int minutes = ReadingPace.minutesFor(rate, secondsPerAyah: pace);
+    return '$by\nAbout ${ayatCount(rate)} a day · around '
+        '${Encouragement.readingTimeWords(minutes * 60)}';
   }
 
   Future<void> _choose(

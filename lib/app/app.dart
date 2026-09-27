@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../domain/entities/enums.dart';
 import '../domain/entities/user_preferences.dart';
 import '../domain/repositories/notification_scheduler.dart';
+import '../domain/services/encouragement.dart';
+import '../features/activity/celebration_sheet.dart';
+import '../features/activity/reading_activity.dart';
 import '../features/today/today_controller.dart';
 import '../shared/theme/app_theme.dart';
 import 'bootstrap.dart';
@@ -14,9 +17,10 @@ import 'routes.dart';
 
 /// Application root.
 ///
-/// Beyond building the [MaterialApp] it owns two cross-cutting behaviours:
-/// following notification taps to the right edition, and refreshing when the
-/// app comes back to the foreground.
+/// Beyond building the [MaterialApp] it owns three cross-cutting behaviours:
+/// following notification taps to the right edition, refreshing when the app
+/// comes back to the foreground, and putting a congratulation in front of the
+/// reader wherever they happen to be when it is earned.
 class DailyQuranApp extends ConsumerStatefulWidget {
   const DailyQuranApp({super.key});
 
@@ -26,6 +30,9 @@ class DailyQuranApp extends ConsumerStatefulWidget {
 
 class _DailyQuranAppState extends ConsumerState<DailyQuranApp>
     with WidgetsBindingObserver {
+  /// Whether a congratulation is on screen, so the next waits its turn.
+  bool _celebrating = false;
+
   @override
   void initState() {
     super.initState();
@@ -51,8 +58,10 @@ class _DailyQuranAppState extends ConsumerState<DailyQuranApp>
     }
     if (state != AppLifecycleState.resumed) return;
     // The reader may have changed notification permission in system settings,
-    // and enough time may have passed for the reading to move on.
+    // and enough time may have passed for the reading to move on — or for a
+    // new day to have begun, with its reading time back at nothing.
     ref.invalidate(reminderReadinessProvider);
+    ref.invalidate(readingSummaryProvider);
     ref.read(todayControllerProvider.notifier).refresh();
   }
 
@@ -118,6 +127,16 @@ class _DailyQuranAppState extends ConsumerState<DailyQuranApp>
       if (link != null) _openFromReminder(link);
     });
 
+    // A streak, a milestone or a reading time reached.
+    ref.listen(celebrationsProvider, (
+      List<Achievement>? previous,
+      List<Achievement> next,
+    ) {
+      // After the notification that brought it, not during it: showing them
+      // empties the queue this is listening to.
+      if (next.isNotEmpty) Future<void>.microtask(_celebrate);
+    });
+
     return MaterialApp.router(
       title: 'Daily Quran',
       debugShowCheckedModeBanner: false,
@@ -144,6 +163,25 @@ class _DailyQuranAppState extends ConsumerState<DailyQuranApp>
         );
       },
     );
+  }
+
+  /// Shows everything waiting to be congratulated, a sheet at a time, until
+  /// nothing is.
+  Future<void> _celebrate() async {
+    if (_celebrating) return;
+    _celebrating = true;
+    try {
+      while (mounted) {
+        final BuildContext? context = rootNavigatorKey.currentContext;
+        if (context == null || !context.mounted) return;
+        final List<Achievement> achieved =
+            ref.read(celebrationsProvider.notifier).takeAll();
+        if (achieved.isEmpty) return;
+        await CelebrationSheet.show(context, achieved);
+      }
+    } finally {
+      _celebrating = false;
+    }
   }
 
   /// Follows a tapped reminder.

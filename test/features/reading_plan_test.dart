@@ -3,6 +3,7 @@ import 'package:daily_quran/app/routes.dart';
 import 'package:daily_quran/domain/entities/enums.dart';
 import 'package:daily_quran/domain/entities/reading_plan.dart';
 import 'package:daily_quran/domain/entities/reading_progress.dart';
+import 'package:daily_quran/domain/entities/reading_track.dart';
 import 'package:daily_quran/domain/entities/user_preferences.dart';
 import 'package:daily_quran/domain/repositories/notification_scheduler.dart';
 import 'package:daily_quran/domain/repositories/progress_repository.dart';
@@ -88,11 +89,15 @@ void main() {
       await harness.pumpApp(tester);
 
       expect(find.text('0 of 4 ayat'), findsOneWidget);
-      // "Today's Ayah" would be a misdescription of a four-ayah goal.
-      expect(find.text('Today’s Reading'), findsOneWidget);
-      // With a plan there are two readings, and the page offers both.
-      expect(find.text('Daily Ayah'), findsOneWidget);
-      expect(find.text('My Plan'), findsOneWidget);
+      // With a plan there are two readings, and the top of the page is the
+      // choice between them rather than a title — the plan first.
+      expect(find.text('Today’s Ayah'), findsNothing);
+      expect(find.text('Today’s Reading'), findsNothing);
+      expect(shownTrack(tester), ReadingTrack.plan);
+      expect(
+        tester.getCenter(find.text('My Plan')).dx,
+        lessThan(tester.getCenter(find.text('Daily Ayah')).dx),
+      );
     });
 
     testWidgets('marking read carries the reader through the portion',
@@ -319,6 +324,49 @@ void main() {
       expect(find.text('Choose the day you want to finish.'), findsOneWidget);
     });
 
+    testWidgets('says roughly how long each plan’s day will take',
+        (WidgetTester tester) async {
+      // The whole Qur'an, so a month is the real 202 a day.
+      final TestHarness harness = await TestHarness.create(
+        contentSource: FakeContentSource.single(count: 6236, surahLength: 100),
+        now: today,
+        initialPreferences: onboarded(),
+      );
+      await harness.pumpApp(tester);
+      await harness.goTo(tester, Routes.planner);
+
+      // Arabic and translation: about twenty seconds an ayah.
+      expect(
+        find.textContaining('About 202 ayat a day · around 1 h 5 min'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('About 18 ayat a day · around 6 min'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('about 20 seconds an ayah'), findsOneWidget);
+    });
+
+    testWidgets('times the day by what is on the reader’s screen',
+        (WidgetTester tester) async {
+      final TestHarness harness = await TestHarness.create(
+        contentSource: FakeContentSource.single(count: 6236, surahLength: 100),
+        now: today,
+        initialPreferences: <String, Object>{
+          ...onboarded(),
+          'flutter.pref.language_mode': LanguageMode.translation.storageKey,
+        },
+      );
+      await harness.pumpApp(tester);
+      await harness.goTo(tester, Routes.planner);
+
+      // A translation alone reads faster than the Arabic with it.
+      expect(
+        find.textContaining('About 202 ayat a day · around 25 min'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('choosing a plan starts it and shows today’s goal',
         (WidgetTester tester) async {
       final TestHarness harness = await TestHarness.create(
@@ -372,7 +420,7 @@ void main() {
       // same arithmetic every dated plan runs on.
       // A month from today falls on the same day, so both plans say it.
       expect(
-        find.text('Finish by Feb 6, 2026\nAbout 4 ayat a day'),
+        find.text('Finish by Feb 6, 2026\nAbout 4 ayat a day · around 1 min'),
         findsNWidgets(2),
       );
       // And the plan's own finish date, without a year it shares with today.
@@ -391,12 +439,12 @@ void main() {
         },
       );
       await harness.pumpApp(tester);
-      expect(find.text('Today’s Ayah'), findsOneWidget);
+      expect(shownTrack(tester), ReadingTrack.daily);
 
       await harness.goTo(tester, Routes.planner);
       await harness.tapButton(tester, 'Continue reading');
 
-      expect(find.text('Today’s Reading'), findsOneWidget);
+      expect(shownTrack(tester), ReadingTrack.plan);
       expect(find.text('0 of 4 ayat'), findsOneWidget);
     });
 

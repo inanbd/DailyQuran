@@ -4,6 +4,7 @@ import 'package:daily_quran/domain/entities/ayah.dart';
 import 'package:daily_quran/domain/entities/enums.dart';
 import 'package:daily_quran/domain/entities/quran_edition.dart';
 import 'package:daily_quran/domain/entities/reading_plan.dart';
+import 'package:daily_quran/domain/entities/reading_track.dart';
 import 'package:daily_quran/domain/entities/user_preferences.dart';
 import 'package:daily_quran/features/today/today_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -94,6 +95,25 @@ void main() {
     expect(find.text('Translation number 1.'), findsOneWidget);
     expect(find.text('اردو ترجمہ نمبر 1۔'), findsOneWidget);
     // Named, because two unlabelled translations are just a repetition.
+    expect(find.text('MAUDUDI (URDU)'), findsOneWidget);
+  });
+
+  testWidgets('the plan’s reading shows the second translation too',
+      (WidgetTester tester) async {
+    // The plan reads under a scope of its own, but it is the same ayat as the
+    // translation beneath it — so the pair must survive the switch.
+    final TestHarness harness = await TestHarness.create(
+      contentSource: library(),
+      initialPreferences: <String, Object>{
+        ...onboarded(second: 'urdu', plan: ReadingPlanKind.oneMonth),
+        'flutter.plan.track': 'separate',
+      },
+    );
+    await harness.pumpApp(tester);
+
+    expect(shownTrack(tester), ReadingTrack.plan);
+    expect(find.text('Translation number 1.'), findsOneWidget);
+    expect(find.text('اردو ترجمہ نمبر 1۔'), findsOneWidget);
     expect(find.text('MAUDUDI (URDU)'), findsOneWidget);
   });
 

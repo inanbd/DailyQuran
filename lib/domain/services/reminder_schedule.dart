@@ -52,6 +52,10 @@ class ReminderSchedule {
 
   /// The reminder date-time strictly after [from], or null if the settings can
   /// never fire (for example "selected days" with nothing selected).
+  ///
+  /// Only the day's *first* reminder counts here and in the other period
+  /// helpers: it is where a reading period begins. Later reminders on the same
+  /// day are nudges within the period — see [upcomingReminders].
   DateTime? nextOccurrenceAfter(DateTime from) {
     for (int offset = 0; offset <= _searchHorizonDays; offset++) {
       final DateTime day = _addDays(_dateOnly(from), offset);
@@ -71,6 +75,37 @@ class ReminderSchedule {
       if (next == null) break;
       result.add(next);
       cursor = next;
+    }
+    return result;
+  }
+
+  /// The next [count] reminders after [from] at *every* time of the day,
+  /// earliest first.
+  ///
+  /// Unlike [nextOccurrences], which counts reading periods, this counts
+  /// notifications: with reminders at 8:00 and 21:00 it returns two a day.
+  ///
+  /// Reminders before [notBefore] are left out. That is how a day's nudges
+  /// fall quiet once its ayah has been read: the reading period is over for
+  /// the reader, so nothing is armed until the next one begins.
+  List<DateTime> upcomingReminders(
+    DateTime from, {
+    int count = 8,
+    DateTime? notBefore,
+  }) {
+    final List<TimeOfDayValue> times = preferences.times;
+    final List<DateTime> result = <DateTime>[];
+    if (times.isEmpty || count <= 0) return result;
+    for (int offset = 0; offset <= _searchHorizonDays; offset++) {
+      final DateTime day = _addDays(_dateOnly(from), offset);
+      if (!occursOn(day)) continue;
+      for (final TimeOfDayValue time in times) {
+        final DateTime candidate = _at(day, time);
+        if (!candidate.isAfter(from)) continue;
+        if (notBefore != null && candidate.isBefore(notBefore)) continue;
+        result.add(candidate);
+        if (result.length == count) return result;
+      }
     }
     return result;
   }

@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 
 import 'notification_preferences.dart';
@@ -64,6 +65,7 @@ class ReadingPlan {
     this.targetDate,
     this.reminderEnabled = true,
     this.reminderTime = defaultReminderTime,
+    this.laterReminderTimes = const <TimeOfDayValue>[],
     this.needsTrackSeed = false,
   });
 
@@ -90,8 +92,18 @@ class ReadingPlan {
   /// Whether the plan sends its own daily reminder with the day's goal.
   final bool reminderEnabled;
 
-  /// When that reminder arrives, as wall-clock time.
+  /// When that reminder arrives, as wall-clock time. The first of the day
+  /// when there are several.
   final TimeOfDayValue reminderTime;
+
+  /// Further reminders on the same day, after [reminderTime]. Each says how
+  /// much of the day's goal is left, and none arrives once it is met.
+  final List<TimeOfDayValue> laterReminderTimes;
+
+  /// Every reminder of the day, earliest first.
+  List<TimeOfDayValue> get reminderTimes => ReminderTimes.normalise(
+        <TimeOfDayValue>[reminderTime, ...laterReminderTimes],
+      );
 
   /// Set on a plan saved before plans had a track of their own.
   ///
@@ -149,6 +161,7 @@ class ReadingPlan {
     DateTime? targetDate,
     bool? reminderEnabled,
     TimeOfDayValue? reminderTime,
+    List<TimeOfDayValue>? laterReminderTimes,
     bool? needsTrackSeed,
     bool clearStartedOn = false,
     bool clearTargetDate = false,
@@ -159,8 +172,17 @@ class ReadingPlan {
       targetDate: clearTargetDate ? null : (targetDate ?? this.targetDate),
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       reminderTime: reminderTime ?? this.reminderTime,
+      laterReminderTimes: laterReminderTimes ?? this.laterReminderTimes,
       needsTrackSeed: needsTrackSeed ?? this.needsTrackSeed,
     );
+  }
+
+  /// This plan with [times] as the day's reminders, the earliest becoming
+  /// [reminderTime]. An empty list changes nothing.
+  ReadingPlan withReminderTimes(Iterable<TimeOfDayValue> times) {
+    final List<TimeOfDayValue> all = ReminderTimes.normalise(times);
+    if (all.isEmpty) return this;
+    return copyWith(reminderTime: all.first, laterReminderTimes: all.sublist(1));
   }
 
   static int _epochDay(DateTime value) =>
@@ -175,6 +197,8 @@ class ReadingPlan {
       other.targetDate == targetDate &&
       other.reminderEnabled == reminderEnabled &&
       other.reminderTime == reminderTime &&
+      const ListEquality<TimeOfDayValue>()
+          .equals(other.laterReminderTimes, laterReminderTimes) &&
       other.needsTrackSeed == needsTrackSeed;
 
   @override
@@ -184,6 +208,7 @@ class ReadingPlan {
         targetDate,
         reminderEnabled,
         reminderTime,
+        Object.hashAll(laterReminderTimes),
         needsTrackSeed,
       );
 

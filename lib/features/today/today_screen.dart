@@ -17,6 +17,8 @@ import '../../domain/entities/reading_progress.dart';
 import '../../domain/entities/reading_track.dart';
 import '../../domain/entities/user_preferences.dart';
 import '../../domain/services/plan_scheduler.dart';
+import '../activity/activity_widgets.dart';
+import '../activity/reading_timer.dart';
 import '../planner/planner_widgets.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
@@ -74,6 +76,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   @override
   Widget build(BuildContext context) {
     final AsyncValue<TodayState> state = ref.watch(todayControllerProvider);
+    final UserPreferences preferences = ref.watch(userPreferencesProvider);
 
     // Moving to another ayah retires a timer armed for the last one.
     final String? ayahId = state.value?.ayah?.id;
@@ -87,25 +90,41 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     // appears, and produces no scroll notification to say so.
     WidgetsBinding.instance.addPostFrameCallback((_) => _considerAutoMark());
 
-    return NotificationListener<ScrollNotification>(
-      // An ancestor of the page's scroll view, which is the only place these
-      // notifications can be caught from.
-      onNotification: (ScrollNotification notification) {
-        _considerAutoMark();
-        // Never absorb it: the scroll view's own listeners still need it.
-        return false;
-      },
-      child: AppPage(
-        // A plan's goal is a reading, not an ayah, so the page says so.
-        title: state.value?.isPlan ?? false
-            ? 'Today’s Reading'
-            : 'Today’s Ayah',
-        actions: <Widget>[_SurahsButton(editionId: state.value?.edition?.id)],
-        child: state.when(
-          loading: () => const LoadingView(),
-          error: (Object error, StackTrace stack) => _TodayError(error: error),
-          data: (TodayState value) =>
-              _TodayBody(state: value, endOfAyahKey: _endOfAyah),
+    // Time counts towards the reader's reading time only while there is an
+    // ayah on screen to read — not over an error, and not over the finished
+    // Qur'an.
+    final bool reading =
+        state.value?.ayah != null && !(state.value?.isComplete ?? false);
+
+    return ReadingTimer(
+      active: reading,
+      child: NotificationListener<ScrollNotification>(
+        // An ancestor of the page's scroll view, which is the only place these
+        // notifications can be caught from.
+        onNotification: (ScrollNotification notification) {
+          _considerAutoMark();
+          // Never absorb it: the scroll view's own listeners still need it.
+          return false;
+        },
+        child: AppPage(
+          title: 'Today’s Ayah',
+          // With a plan there are two readings, and the top of the page is
+          // where the reader picks between them — the choice names the page
+          // better than a title could. Read from preferences rather than the
+          // loaded state, so it is there from the first frame.
+          heading: preferences.plan.isPaced
+              ? _TrackSwitch(track: preferences.activeTrack)
+              : null,
+          actions: <Widget>[
+            _SurahsButton(editionId: state.value?.edition?.id),
+          ],
+          child: state.when(
+            loading: () => const LoadingView(),
+            error: (Object error, StackTrace stack) =>
+                _TodayError(error: error),
+            data: (TodayState value) =>
+                _TodayBody(state: value, endOfAyahKey: _endOfAyah),
+          ),
         ),
       ),
     );
@@ -203,22 +222,6 @@ class _TodayBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final Widget content = _content(context, ref);
-    if (!state.hasPlan) return content;
-
-    // With a plan there are two readings, and the reader picks between them
-    // here — never by wondering which one the page is showing.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        _TrackSwitch(track: state.track),
-        const SizedBox(height: AppSpacing.xl),
-        content,
-      ],
-    );
-  }
-
-  Widget _content(BuildContext context, WidgetRef ref) {
     final QuranEdition? edition = state.edition;
     if (edition == null) return const _NoEditionChosen();
 
@@ -327,6 +330,7 @@ class _TodayBody extends ConsumerWidget {
             read: progress.totalRead,
             total: progress.totalAyah,
           ),
+          const ReadingTimeGoalBar(),
           const SizedBox(height: AppSpacing.xl),
           _ReadingActions(state: state),
         ],
@@ -355,7 +359,11 @@ class _TodayBody extends ConsumerWidget {
   }
 }
 
-/// Chooses between the Daily Ayah and the plan's reading.
+/// Chooses between the plan's reading and the Daily Ayah — the plan first,
+/// since a reader who made one reads it first.
+///
+/// Sits where the page title would, so the reader never has to wonder which
+/// reading the page is showing.
 class _TrackSwitch extends ConsumerWidget {
   const _TrackSwitch({required this.track});
 
@@ -370,14 +378,14 @@ class _TrackSwitch extends ConsumerWidget {
     return SegmentedButton<ReadingTrack>(
       segments: const <ButtonSegment<ReadingTrack>>[
         ButtonSegment<ReadingTrack>(
-          value: ReadingTrack.daily,
-          label: Text('Daily Ayah'),
-          icon: Icon(Icons.wb_sunny_outlined, size: 18),
-        ),
-        ButtonSegment<ReadingTrack>(
           value: ReadingTrack.plan,
           label: Text('My Plan'),
           icon: Icon(Icons.flag_outlined, size: 18),
+        ),
+        ButtonSegment<ReadingTrack>(
+          value: ReadingTrack.daily,
+          label: Text('Daily Ayah'),
+          icon: Icon(Icons.wb_sunny_outlined, size: 18),
         ),
       ],
       selected: <ReadingTrack>{track},

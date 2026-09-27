@@ -84,6 +84,10 @@ abstract interface class NotificationScheduler {
   /// The two are independent: the Daily Ayah reminder follows [preferences]
   /// and may be off while a plan's reminders are on, or the other way round.
   ///
+  /// [quietUntil] is set once the Daily Ayah has been read for its reading
+  /// period: none of its reminders is armed before then. It is what keeps a
+  /// day's later reminders from nudging a reader who has already read.
+  ///
   /// Called whenever preferences change and on every app start, which is what
   /// keeps reminders correct across reboots, app updates, DST transitions and
   /// the reader travelling to a new timezone.
@@ -97,6 +101,7 @@ abstract interface class NotificationScheduler {
     required String? editionId,
     ReminderMessage message = ReminderMessage.invitation,
     List<PlanReminder> planReminders = const <PlanReminder>[],
+    DateTime? quietUntil,
   });
 
   Future<void> cancelAll();

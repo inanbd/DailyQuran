@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:daily_quran/data/local/activity_dao.dart';
 import 'package:daily_quran/data/local/app_database.dart';
 import 'package:daily_quran/data/local/ayah_dao.dart';
 import 'package:daily_quran/data/local/favourites_dao.dart';
@@ -254,6 +255,82 @@ void main() {
     expect(
       await FavouritesDao(upgraded).isFavourite('quran', '2:255'),
       isTrue,
+    );
+  });
+
+  test('upgrading from v3 adds reading days and milestones, and keeps the rest',
+      () async {
+    // v3 is v1 with the words column. Its text was already refilled with
+    // glosses, so this upgrade must leave it where it is.
+    final Database db = await databaseFactoryFfi.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: 3,
+        onCreate: (Database db, int version) async {
+          await db.execute(_v1Ayah);
+          await db.execute(_v1Progress);
+          await db.execute(_v1Read);
+          await db.execute(_v1Favourites);
+          await db.execute('ALTER TABLE ayah ADD COLUMN words TEXT');
+        },
+      ),
+    );
+    await db.insert('ayah', <String, Object?>{
+      'id': 'saheeh_international:2:255',
+      'edition_id': 'saheeh_international',
+      'ordinal': 262,
+      'surah_number': 2,
+      'ayah_number': 255,
+      'verse_key': '2:255',
+      'arabic_text': 'نص',
+      'translation_text': 'A translation.',
+    });
+    await db.insert('read_ayah', <String, Object?>{
+      'scope': 'quran',
+      'verse_key': '2:255',
+      'ordinal': 262,
+      'read_at': 1700000000000,
+    });
+    await db.close();
+
+    final AppDatabase upgraded = AppDatabase(
+      factoryOverride: databaseFactoryFfi,
+      pathOverride: path,
+    );
+    addTearDown(upgraded.close);
+
+    expect(await (await upgraded.database).getVersion(), 4);
+    expect(await AyahDao(upgraded).countFor('saheeh_international'), 1);
+    expect(
+      (await ProgressDao(upgraded).progressFor('quran', 6236)).totalRead,
+      1,
+    );
+
+    // The new tables are there, and empty: nothing is guessed at.
+    final ActivityDao activity = ActivityDao(upgraded);
+    expect(await activity.goalMetDays(), isEmpty);
+    await activity.addReadingTime(DateTime(2026, 1, 7), 60);
+    expect((await activity.dayOf(DateTime(2026, 1, 7))).seconds, 60);
+    expect(
+      await ProgressDao(upgraded)
+          .reachMilestone('quran', 10, DateTime(2026, 1, 7)),
+      isTrue,
+    );
+  });
+
+  test('upgrading from v1 arrives with the reading-day tables too', () async {
+    await seedV1();
+
+    final AppDatabase upgraded = AppDatabase(
+      factoryOverride: databaseFactoryFfi,
+      pathOverride: path,
+    );
+    addTearDown(upgraded.close);
+
+    await ActivityDao(upgraded).addReadingTime(DateTime(2026, 1, 7), 30);
+    expect(
+      (await ActivityDao(upgraded).dayOf(DateTime(2026, 1, 7))).seconds,
+      30,
     );
   });
 

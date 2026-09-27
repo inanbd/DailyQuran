@@ -27,11 +27,14 @@ class PreferencesStore implements PreferencesRepository {
   static const String _kCurrentEdition = 'pref.current_edition_id';
   static const String _kSecondaryEdition = 'pref.secondary_edition_id';
   static const String _kReadingTrack = 'pref.reading_track';
+  static const String _kDailyReadingMinutes = 'pref.daily_reading_minutes';
+  static const String _kCelebrations = 'pref.celebrations';
   static const String _kPlanKind = 'plan.kind';
   static const String _kPlanStartedOn = 'plan.started_on';
   static const String _kPlanTargetDate = 'plan.target_date';
   static const String _kPlanReminderEnabled = 'plan.reminder_enabled';
   static const String _kPlanReminderTime = 'plan.reminder_time';
+  static const String _kPlanReminderLaterTimes = 'plan.reminder_later_times';
 
   /// Written with every save. A paced plan stored without it predates plans
   /// having a track of their own — see [ReadingPlan.needsTrackSeed].
@@ -42,6 +45,7 @@ class PreferencesStore implements PreferencesRepository {
   static const String _kNotifyFrequency = 'notify.frequency';
   static const String _kNotifyWeekdays = 'notify.weekdays';
   static const String _kNotifyTime = 'notify.time';
+  static const String _kNotifyLaterTimes = 'notify.later_times';
   static const String _kNotifyContent = 'notify.content';
   static const String _kNotifyTimezone = 'notify.timezone';
   static const String _kNotifyAnchor = 'notify.anchor_date';
@@ -60,7 +64,20 @@ class PreferencesStore implements PreferencesRepository {
       readingTrack: ReadingTrack.fromStorage(_prefs.getString(_kReadingTrack)),
       currentEditionId: _prefs.getString(_kCurrentEdition),
       secondaryEditionId: _prefs.getString(_kSecondaryEdition),
+      dailyReadingMinutes: _loadReadingMinutes(),
+      celebrations: _prefs.getBool(_kCelebrations) ?? true,
     );
+  }
+
+  /// A stored reading time the app no longer offers — or nonsense — reads as
+  /// no goal rather than as an odd number the settings screen cannot show.
+  int _loadReadingMinutes() {
+    final int? minutes = _prefs.getInt(_kDailyReadingMinutes);
+    if (minutes == null ||
+        !UserPreferences.readingMinuteChoices.contains(minutes)) {
+      return 0;
+    }
+    return minutes;
   }
 
   ReadingPlan _loadPlan() {
@@ -73,7 +90,7 @@ class PreferencesStore implements PreferencesRepository {
     if (kind == ReadingPlanKind.custom && targetDate == null) {
       kind = ReadingPlanKind.oneAyah;
     }
-    return ReadingPlan(
+    final ReadingPlan plan = ReadingPlan(
       kind: kind,
       startedOn: startedOn == null
           ? null
@@ -88,6 +105,13 @@ class PreferencesStore implements PreferencesRepository {
       needsTrackSeed: kind.isPaced &&
           _prefs.getString(_kPlanTrack) != _planTrackSeparate,
     );
+    // Put back in order through the same door the settings use, so a stored
+    // list that was edited out of order cannot make a later reminder the
+    // first of the day.
+    return plan.withReminderTimes(<TimeOfDayValue>[
+      plan.reminderTime,
+      ...ReminderTimes.parse(_prefs.getStringList(_kPlanReminderLaterTimes)),
+    ]);
   }
 
   @override
@@ -126,6 +150,15 @@ class PreferencesStore implements PreferencesRepository {
       _kPlanReminderTime,
       preferences.plan.reminderTime.storageValue,
     );
+    await _prefs.setStringList(
+      _kPlanReminderLaterTimes,
+      ReminderTimes.toStorage(preferences.plan.laterReminderTimes),
+    );
+    await _prefs.setInt(
+      _kDailyReadingMinutes,
+      preferences.dailyReadingMinutes,
+    );
+    await _prefs.setBool(_kCelebrations, preferences.celebrations);
     // Only a plan still waiting for its progress to be carried over may be
     // saved without the marker, or the carry-over would never happen.
     if (preferences.plan.needsTrackSeed) {
@@ -157,7 +190,7 @@ class PreferencesStore implements PreferencesRepository {
   Future<NotificationPreferences> loadNotificationPreferences() async {
     final List<String>? weekdays = _prefs.getStringList(_kNotifyWeekdays);
     final int? anchor = _prefs.getInt(_kNotifyAnchor);
-    return NotificationPreferences(
+    final NotificationPreferences preferences = NotificationPreferences(
       enabled: _prefs.getBool(_kNotifyEnabled) ?? false,
       frequency:
           NotificationFrequency.fromStorage(_prefs.getString(_kNotifyFrequency)),
@@ -168,6 +201,12 @@ class PreferencesStore implements PreferencesRepository {
       anchorDate:
           anchor == null ? null : DateTime.fromMillisecondsSinceEpoch(anchor),
     );
+    // Normalised on the way in, as the plan's are: the earliest time is
+    // always the one the reading day starts at.
+    return preferences.withTimes(<TimeOfDayValue>[
+      preferences.time,
+      ...ReminderTimes.parse(_prefs.getStringList(_kNotifyLaterTimes)),
+    ]);
   }
 
   @override
@@ -186,6 +225,10 @@ class PreferencesStore implements PreferencesRepository {
           .toList(growable: false),
     );
     await _prefs.setString(_kNotifyTime, preferences.time.storageValue);
+    await _prefs.setStringList(
+      _kNotifyLaterTimes,
+      ReminderTimes.toStorage(preferences.laterTimes),
+    );
     await _prefs.setString(_kNotifyContent, preferences.content.storageKey);
     final String? timezone = preferences.timezone;
     if (timezone == null) {

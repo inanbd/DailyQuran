@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/content/asset_quran_content_source.dart';
+import '../data/local/activity_dao.dart';
 import '../data/local/app_database.dart';
 import '../data/local/ayah_dao.dart';
 import '../data/local/favourites_dao.dart';
 import '../data/local/preferences_store.dart';
 import '../data/local/progress_dao.dart';
 import '../data/notifications/local_notification_scheduler.dart';
+import '../data/repositories/activity_repository_impl.dart';
 import '../data/repositories/favourites_repository_impl.dart';
 import '../data/repositories/progress_repository_impl.dart';
 import '../data/repositories/quran_repository_impl.dart';
@@ -18,8 +20,10 @@ import '../domain/entities/enums.dart';
 import '../domain/entities/notification_preferences.dart';
 import '../domain/entities/quran_edition.dart';
 import '../domain/entities/reading_plan.dart';
+import '../domain/entities/reading_progress.dart';
 import '../domain/entities/reading_track.dart';
 import '../domain/entities/user_preferences.dart';
+import '../domain/repositories/activity_repository.dart';
 import '../domain/repositories/favourites_repository.dart';
 import '../domain/repositories/notification_scheduler.dart';
 import '../domain/repositories/preferences_repository.dart';
@@ -29,6 +33,7 @@ import '../domain/repositories/quran_repository.dart';
 import '../domain/repositories/speech_synthesizer.dart';
 import '../domain/services/plan_reminder_composer.dart';
 import '../domain/services/reminder_message_composer.dart';
+import '../domain/services/reminder_schedule.dart';
 
 /// Thrown if a provider that must be overridden at startup is read directly.
 Never _mustOverride(String name) =>
@@ -75,6 +80,10 @@ final Provider<FavouritesDao> favouritesDaoProvider = Provider<FavouritesDao>(
   (Ref ref) => FavouritesDao(ref.watch(appDatabaseProvider)),
 );
 
+final Provider<ActivityDao> activityDaoProvider = Provider<ActivityDao>(
+  (Ref ref) => ActivityDao(ref.watch(appDatabaseProvider)),
+);
+
 final Provider<QuranRepository> quranRepositoryProvider =
     Provider<QuranRepository>(
   (Ref ref) => QuranRepositoryImpl(
@@ -94,6 +103,11 @@ final Provider<FavouritesRepository> favouritesRepositoryProvider =
     favouritesDao: ref.watch(favouritesDaoProvider),
     ayahDao: ref.watch(ayahDaoProvider),
   ),
+);
+
+final Provider<ActivityRepository> activityRepositoryProvider =
+    Provider<ActivityRepository>(
+  (Ref ref) => ActivityRepositoryImpl(ref.watch(activityDaoProvider)),
 );
 
 final Provider<PreferencesRepository> preferencesRepositoryProvider =
@@ -207,6 +221,7 @@ class NotificationPreferencesController
         editionId: ref.read(userPreferencesProvider).currentEditionId,
         message: await _composeMessage(),
         planReminders: await _composePlanReminders(),
+        quietUntil: await _quietUntil(),
       );
     } on Object catch (error, stack) {
       debugPrint('Daily Quran: could not arm reminders: $error\n$stack');
@@ -263,6 +278,42 @@ class NotificationPreferencesController
     } on Object catch (error) {
       debugPrint('Daily Quran: falling back to a plain reminder ($error)');
       return ReminderMessage.invitation;
+    }
+  }
+
+  /// When the Daily Ayah's reminders may speak again, or null when they have
+  /// nothing to wait for.
+  ///
+  /// Set once the ayah of the current reading period has been read: the
+  /// period's later reminders would only be nudging a reader who has already
+  /// read, so nothing is armed until the next period begins.
+  ///
+  /// Only worked out when there *are* later reminders. With one a day the
+  /// next reminder always begins the next period anyway, and startup is
+  /// spared a query for a reader who never added a second.
+  Future<DateTime?> _quietUntil() async {
+    if (!state.enabled || state.laterTimes.isEmpty) return null;
+    final String? editionId = ref.read(userPreferencesProvider).currentEditionId;
+    if (editionId == null) return null;
+
+    try {
+      final QuranEdition? edition =
+          await ref.read(quranRepositoryProvider).edition(editionId);
+      if (edition == null || edition.totalAyah <= 0) return null;
+      final ReadingProgress progress = await ref
+          .read(progressRepositoryProvider)
+          .progressFor(edition.scope, edition.totalAyah);
+      final DateTime? lastRead = progress.lastReadAt;
+      if (lastRead == null) return null;
+
+      final DateTime now = ref.read(clockProvider)();
+      final ReminderSchedule schedule = ReminderSchedule(state);
+      if (lastRead.isBefore(schedule.currentPeriodStart(now))) return null;
+      return schedule.nextOccurrenceAfter(now);
+    } on Object catch (error) {
+      // Better a nudge too many than a reminder lost.
+      debugPrint('Daily Quran: reminders not quietened ($error)');
+      return null;
     }
   }
 

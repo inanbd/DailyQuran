@@ -7,9 +7,10 @@ import 'package:flutter/services.dart';
 /// Battery optimisation is the reason a reminder that was scheduled correctly
 /// still never arrives. Android — and, far more aggressively, several
 /// manufacturer skins on top of it — will put an app it considers idle to
-/// sleep and drop its pending alarms with it. Asking for the exemption raises
-/// the system's own "Allow app to always run in the background?" dialog; the
-/// reader decides, and the app carries on either way.
+/// sleep and drop its pending alarms with it. Asking for the exemption opens
+/// the system's battery optimisation list, where the reader turns it off for
+/// the app; the app carries on either way. (The one-tap system dialog needs a
+/// permission Google Play reserves for apps whose core function needs it.)
 ///
 /// Every method is best-effort. On iOS, on a platform without the host side
 /// registered, or if the OS simply refuses, the call reports "no" rather than
@@ -30,8 +31,8 @@ class DevicePowerSettings {
   Future<bool?> isExemptFromBatteryOptimisation() =>
       _invoke<bool>('isIgnoringBatteryOptimizations');
 
-  /// Raises the system dialog asking for the exemption, and reports the state
-  /// after the reader has answered.
+  /// Opens the system's battery optimisation list, and reports the state once
+  /// the reader comes back from it.
   Future<bool> requestBatteryOptimisationExemption() async =>
       await _invoke<bool>('requestIgnoreBatteryOptimizations') ?? false;
 

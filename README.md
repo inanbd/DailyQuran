@@ -470,6 +470,10 @@ assets/
 tool/
   import_quran.dart, fetch_quran_json.sh
   import_word_by_word.dart, fetch_word_by_word.sh
+  icon/         The app icon, drawn in code, and what renders every size
+  new_keystore.ps1
+fastlane/metadata/android/
+                Google Play listing: text, graphics, release notes
 ```
 
 ## Architecture
@@ -535,8 +539,12 @@ Some deliberate choices:
   - *Exact timing* (`SCHEDULE_EXACT_ALARM`) — without it Android may hold a
     reminder until the device next wakes, which under Doze can be hours.
   - *Unrestricted battery use* — without it the phone can put the app to sleep
-    and drop its pending alarms. Raised through the `MainActivity` method
-    channel, which `flutter_local_notifications` does not cover.
+    and drop its pending alarms. The `MainActivity` method channel, which
+    `flutter_local_notifications` does not cover, opens the system's battery
+    optimisation list, where the reader turns it off for Daily Quran. The
+    one-tap dialog is not used: its permission,
+    `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, is one Google Play allows only for
+    apps whose core function needs it.
 - **Declining never breaks anything.** Reminders still switch on; they are armed
   as inexact alarms instead, and the *Delivery* section of notification settings
   keeps the fix on offer. Granting one later re-arms the reminders, so the more
@@ -650,6 +658,20 @@ Release builds sign with the key named in `android/key.properties`, and fall
 back to the debug key when that file is absent. `tool/new_keystore.ps1`
 creates the keystore and the properties file; neither is ever committed.
 
+**The icon** — an open mushaf beneath an eight-point star, in the app's green
+and gold — is drawn in code in
+[`tool/icon/app_icon.dart`](tool/icon/app_icon.dart). After changing it,
+render every size again:
+
+```bash
+flutter test tool/icon/generate_icons_test.dart
+```
+
+That writes Android's adaptive icon layers (with a monochrome one for themed
+icons) and its pre-Android 8 icon, every iOS size (without an alpha channel,
+which App Store Connect refuses), and Google Play's 512px icon and feature
+graphic.
+
 **iOS**
 
 ```bash
@@ -694,6 +716,38 @@ without uninstalling first. To sign with the app's own key, add these under
 
 Every release after that installs over the last.
 
+### Google Play
+
+Play takes an app bundle signed with the upload key, which lives only on the
+machine that holds `android/key.properties`:
+
+```bash
+flutter build appbundle --release
+# → build/app/outputs/bundle/release/app-release.aab
+```
+
+Upload it in Play Console under **Test and release**. What the listing needs
+is kept in the repository, in the layout `fastlane supply` reads:
+
+| File | Play Console field |
+|---|---|
+| `fastlane/metadata/android/en-US/title.txt` | App name (30 characters) |
+| `…/short_description.txt` | Short description (80) |
+| `…/full_description.txt` | Full description (4,000) |
+| `…/changelogs/<versionCode>.txt` | Release notes (500) |
+| `…/images/icon.png` | App icon, 512 × 512 |
+| `…/images/featureGraphic.png` | Feature graphic, 1024 × 500 |
+| `…/images/phoneScreenshots/` | Phone screenshots, 1080 × 2160 |
+
+Add a `changelogs/<versionCode>.txt` with each version. Play refuses a
+screenshot more than twice as tall as it is wide, and one with an alpha
+channel, so a 1080 × 2400 phone's own screenshots need the screen set to
+`adb shell wm size 1080x2160` first and saving as 24-bit. The privacy policy
+Play asks for is [`PRIVACY.md`](PRIVACY.md).
+
+The APK on a GitHub Release is signed differently from the one Play delivers,
+so a phone cannot move from one to the other without uninstalling.
+
 ## Accessibility
 
 - Reading text size is a preference that **multiplies** the platform's dynamic
@@ -729,6 +783,8 @@ The one place the app can put anything where someone other than the reader might
 see it is the lock screen, and it does so only on request: reminders reveal
 nothing by default, and the setting that changes that says plainly what it will
 show and where. See [What the reminder says](#what-the-reminder-says).
+
+The published privacy policy is [`PRIVACY.md`](PRIVACY.md).
 
 ## Licences
 

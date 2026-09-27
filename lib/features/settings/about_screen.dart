@@ -78,8 +78,9 @@ class AboutScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
           Text(
             'No account is required and nothing you read leaves your device. '
-            'The app asks for one permission — notifications — and only once '
-            'you have chosen a reminder time.',
+            'Every permission the app asks for serves reminders — '
+            'notifications, exact alarms and unrestricted battery use — and '
+            'none is asked for until you have chosen a reminder time.',
             style: AppTypography.reference.copyWith(
               color: colors.textSecondary,
               height: 1.6,

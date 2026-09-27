@@ -2,7 +2,7 @@
 
 Each version's section is published as its GitHub Release notes.
 
-## Unreleased
+## 1.3.0
 
 **Reading time, streaks and several reminders a day.**
 
@@ -27,8 +27,15 @@ Each version's section is published as its GitHub Release notes.
 - **A tidier reading screen.** The bottom tab is now **Read**, and Progress sits
   right beside it. With a plan, **My Plan** / **Daily Ayah** sits at the top in
   place of the title, your plan first.
+- **A new icon** — an open mushaf beneath an eight-point star.
+- **Unrestricted battery use** now opens your phone's battery list: find Daily
+  Quran there and choose *Unrestricted* (or *Don't optimise*). The app no
+  longer asks with a one-tap dialog, whose permission Google Play reserves for
+  other kinds of app.
 - **Fixed:** a second translation now shows under your plan's reading, not only
   under the Daily Ayah.
+- **Fixed:** the privacy note under Settings → About now names every permission
+  the app asks for.
 
 ## 1.2.0
 

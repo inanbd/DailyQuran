@@ -159,7 +159,8 @@ abstract final class ReminderRequirementLabels {
     }
   }
 
-  /// What the reader loses without it.
+  /// What the reader loses without it — and, for the one the app can only
+  /// point them to, what to do when they get there.
   static String reason(ReminderRequirement requirement) {
     switch (requirement) {
       case ReminderRequirement.notifications:
@@ -169,7 +170,9 @@ abstract final class ReminderRequirementLabels {
             'whenever your phone next wakes up.';
       case ReminderRequirement.background:
         return 'Stops your phone putting the app to sleep and cancelling '
-            'tomorrow’s reminder with it.';
+            'tomorrow’s reminder with it. In the list, find Daily Quran — '
+            'showing all apps if need be — and choose Unrestricted or '
+            'Don’t optimise.';
     }
   }
 

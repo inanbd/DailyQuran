@@ -19,8 +19,10 @@ import io.flutter.plugin.common.MethodChannel
  * Battery optimisation is the usual reason a reminder that was scheduled
  * correctly never arrives: Android — and, far more aggressively, several
  * manufacturer skins — put an app it considers idle to sleep and drop its
- * pending alarms with it. The exemption has its own system dialog, and the
- * reader decides.
+ * pending alarms with it. The reader grants the exemption on the system's
+ * battery optimisation list; the app only opens it for them. The direct
+ * dialog (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) is off limits: Google
+ * Play allows its permission only for apps whose core function needs it.
  *
  * The other is the way back into notification settings, for once the OS has
  * stopped offering its own permission prompt.
@@ -30,7 +32,7 @@ import io.flutter.plugin.common.MethodChannel
  */
 class MainActivity : FlutterActivity() {
 
-    /** The Dart call waiting on the battery-optimisation dialog, if any. */
+    /** The Dart call waiting on the battery optimisation list, if any. */
     private var pendingExemption: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -63,27 +65,31 @@ class MainActivity : FlutterActivity() {
         // current state rather than leaving its future hanging.
         settlePendingExemption()
 
-        val request = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-            .setData(Uri.parse("package:$packageName"))
-        try {
-            pendingExemption = result
-            startActivityForResult(request, EXEMPTION_REQUEST_CODE)
-        } catch (error: ActivityNotFoundException) {
-            pendingExemption = null
-            // Some builds ship without the direct dialog. The full list screen
-            // is the next best thing; the reader finds the app on it themselves,
-            // and the app re-reads the real state when it comes back to the
-            // foreground.
-            openBatteryOptimisationSettings()
-            result.success(false)
+        // Waited on like a dialog, so the permission flow moves on only once
+        // the reader is back. Some builds hide the list; the app's own info
+        // page is the next best thing, with battery one tap further in.
+        val candidates = listOf(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:$packageName")),
+        )
+        pendingExemption = result
+        for (intent in candidates) {
+            try {
+                startActivityForResult(intent, EXEMPTION_REQUEST_CODE)
+                return
+            } catch (error: ActivityNotFoundException) {
+                // Try the next one.
+            }
         }
+        pendingExemption = null
+        result.success(false)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != EXEMPTION_REQUEST_CODE) return
-        // The result code is not worth reading — the dialog reports cancelled
-        // even when the reader allowed it. Ask the OS what actually changed.
+        // A settings screen has no answer to give; ask the OS what changed.
         settlePendingExemption()
     }
 
@@ -98,9 +104,6 @@ class MainActivity : FlutterActivity() {
         pendingExemption = null
         runCatching { waiting.success(isExemptFromBatteryOptimisation()) }
     }
-
-    private fun openBatteryOptimisationSettings(): Boolean =
-        startFirstAvailable(listOf(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)))
 
     /**
      * Opens this app's notification settings, falling back to its app info

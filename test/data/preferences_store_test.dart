@@ -1,4 +1,5 @@
 import 'package:daily_quran/data/local/preferences_store.dart';
+import 'package:daily_quran/domain/entities/enums.dart';
 import 'package:daily_quran/domain/entities/notification_preferences.dart';
 import 'package:daily_quran/domain/entities/reading_plan.dart';
 import 'package:daily_quran/domain/entities/user_preferences.dart';
@@ -90,6 +91,30 @@ void main() {
 
     expect(loaded.dailyReadingMinutes, 0);
     expect(loaded.celebrations, isTrue);
+  });
+
+  test('scrolling instead of swiping is kept, and swiping is the default',
+      () async {
+    final PreferencesStore first = await store();
+    expect(
+      (await first.loadUserPreferences()).readingLayout,
+      ReadingLayout.swipe,
+      reason: 'every reader before this setting swiped',
+    );
+
+    await first.saveUserPreferences(
+      UserPreferences.defaults.copyWith(readingLayout: ReadingLayout.scroll),
+    );
+    expect(
+      (await first.loadUserPreferences()).readingLayout,
+      ReadingLayout.scroll,
+    );
+
+    final UserPreferences nonsense = await (await store(<String, Object>{
+      'flutter.pref.reading_layout': 'sideways',
+    }))
+        .loadUserPreferences();
+    expect(nonsense.readingLayout, ReadingLayout.swipe);
   });
 
   test('a reading time the app does not offer reads as none', () async {

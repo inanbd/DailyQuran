@@ -29,6 +29,7 @@ class PreferencesStore implements PreferencesRepository {
   static const String _kReadingTrack = 'pref.reading_track';
   static const String _kDailyReadingMinutes = 'pref.daily_reading_minutes';
   static const String _kCelebrations = 'pref.celebrations';
+  static const String _kReadingLayout = 'pref.reading_layout';
   static const String _kPlanKind = 'plan.kind';
   static const String _kPlanStartedOn = 'plan.started_on';
   static const String _kPlanTargetDate = 'plan.target_date';
@@ -66,6 +67,8 @@ class PreferencesStore implements PreferencesRepository {
       secondaryEditionId: _prefs.getString(_kSecondaryEdition),
       dailyReadingMinutes: _loadReadingMinutes(),
       celebrations: _prefs.getBool(_kCelebrations) ?? true,
+      readingLayout:
+          ReadingLayout.fromStorage(_prefs.getString(_kReadingLayout)),
     );
   }
 
@@ -159,6 +162,10 @@ class PreferencesStore implements PreferencesRepository {
       preferences.dailyReadingMinutes,
     );
     await _prefs.setBool(_kCelebrations, preferences.celebrations);
+    await _prefs.setString(
+      _kReadingLayout,
+      preferences.readingLayout.storageKey,
+    );
     // Only a plan still waiting for its progress to be carried over may be
     // saved without the marker, or the carry-over would never happen.
     if (preferences.plan.needsTrackSeed) {

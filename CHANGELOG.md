@@ -2,6 +2,24 @@
 
 Each version's section is published as its GitHub Release notes.
 
+## 1.4.0
+
+**Turn the page like a gallery — or scroll straight through.**
+
+- **A smoother page turn.** The ayah now follows your finger as you swipe,
+  with the next one already there beneath it, and settles into place the way
+  a gallery of pictures does. Let go past halfway, or flick, to turn the page;
+  let go early and it springs back. The arrows and *Mark as read* slide it the
+  same way.
+- **Scroll instead, if you prefer.** Under Settings → Reading → Moving between
+  ayat, choose *Scroll, one after another* to read the Qur'an as one
+  continuous column, surah after surah, each surah headed by its name and the
+  basmala.
+- **Only what you read is marked.** When scrolling, an ayah counts as read once
+  it has been on screen for about as long as it takes to read and you scroll
+  on past it. Flicking through marks nothing, and each ayah has a tick to mark
+  or unmark it yourself.
+
 ## 1.3.0
 
 **Reading time, streaks and several reminders a day.**

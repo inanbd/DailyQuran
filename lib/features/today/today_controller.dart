@@ -253,9 +253,23 @@ class TodayController extends AsyncNotifier<TodayState> {
 
   Future<void> markUnread() => _setRead(false, advance: false);
 
-  Future<void> _setRead(bool read, {required bool advance}) async {
+  /// Marks [ayah] read without moving the reader's place — for the scrolling
+  /// view, where the ayah just read has usually been scrolled past and the
+  /// place is further on.
+  Future<void> markAyahRead(Ayah ayah) =>
+      _setRead(true, advance: false, target: ayah);
+
+  /// Marks [ayah] unread, leaving the reader's place where it is.
+  Future<void> markAyahUnread(Ayah ayah) =>
+      _setRead(false, advance: false, target: ayah);
+
+  Future<void> _setRead(
+    bool read, {
+    required bool advance,
+    Ayah? target,
+  }) async {
     final TodayState? current = state.value;
-    final Ayah? ayah = current?.ayah;
+    final Ayah? ayah = target ?? current?.ayah;
     final QuranEdition? edition = current?.edition;
     final String? scope = current?.scope;
     if (ayah == null || edition == null || scope == null) return;
@@ -280,10 +294,24 @@ class TodayController extends AsyncNotifier<TodayState> {
       );
     }
 
+    // An ayah marked from elsewhere leaves the place where it was — storage
+    // moves the place to whatever is marked, so it is put back.
+    if (target != null) {
+      await repository.setCurrentOrdinal(
+        scope,
+        current!.ordinal,
+        edition.totalAyah,
+      );
+    }
+
     // Advancing means handing the choice back to the reading rule, which holds
     // position once the portion is finished and moves to the next unread ayah
     // while it is not. Otherwise the reader stays exactly where they acted.
-    _pinnedOrdinal = advance ? null : ayah.ordinal;
+    _pinnedOrdinal = advance
+        ? null
+        : target != null
+            ? current!.ordinal
+            : ayah.ordinal;
     _invalidateProgressViews();
     ref.invalidateSelf();
     await future;
@@ -536,3 +564,55 @@ class TodayController extends AsyncNotifier<TodayState> {
 
 final AsyncNotifierProvider<TodayController, TodayState> todayControllerProvider =
     AsyncNotifierProvider<TodayController, TodayState>(TodayController.new);
+
+/// One page of the reading: the ayah at a position, the same ayah in the
+/// second translation, and whether it has been read.
+@immutable
+class ReadingPage {
+  const ReadingPage({this.ayah, this.secondaryAyah, this.isRead = false});
+
+  final Ayah? ayah;
+  final Ayah? secondaryAyah;
+  final bool isRead;
+}
+
+/// Where a page is: the edition and second translation it is shown in, the
+/// scope its reading is kept under, and its position.
+typedef ReadingPageKey = ({
+  String editionId,
+  String? secondaryId,
+  String scope,
+  int ordinal,
+});
+
+/// Any page of the reading, not only the one the reader's place is on: the
+/// pages either side of it, which a swipe shows before it lands, and every
+/// ayah of the scrolling view.
+///
+/// Dropped as soon as nothing shows it, so it is always read afresh.
+final readingPageProvider =
+    FutureProvider.autoDispose.family<ReadingPage, ReadingPageKey>(
+  (Ref ref, ReadingPageKey key) async {
+    // Everything this needs is read before the first wait: by the time the
+    // text arrives, the page may have scrolled away and this been let go.
+    final QuranRepository quran = ref.watch(quranRepositoryProvider);
+    final ProgressRepository progress = ref.watch(progressRepositoryProvider);
+    final Ayah? ayah = await quran.ayahAt(key.editionId, key.ordinal);
+    if (ayah == null) return const ReadingPage();
+
+    Ayah? second;
+    final String? secondaryId = key.secondaryId;
+    if (secondaryId != null && secondaryId != key.editionId) {
+      try {
+        second = await quran.ayahAt(secondaryId, key.ordinal);
+      } on AppException {
+        // As on the page itself: a second translation that cannot be shown
+        // costs that translation, never the page.
+        second = null;
+      }
+    }
+
+    final bool isRead = await progress.isRead(key.scope, ayah.verseKey);
+    return ReadingPage(ayah: ayah, secondaryAyah: second, isRead: isRead);
+  },
+);

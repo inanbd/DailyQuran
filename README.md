@@ -78,9 +78,10 @@ large portion: a dwell timer that also advanced would walk itself through the
 whole day's reading, five seconds at a time, while the reader sat still.
 Pressing *Mark as read* does advance, because that is a deliberate act.
 
-Moving between ayat is browsing, not reading: the arrows, a horizontal swipe on
-the reading surface, and the surah index all change position without marking
-anything.
+Moving between ayat is browsing, not reading: the arrows, a swipe of the
+carousel, and the surah index all change position without marking anything.
+(The scrolling view has a rule of its own — see
+[Swiping or scrolling](#swiping-or-scrolling).)
 
 A "period" is the interval between reminders, so a weekly reader advances weekly
 and a daily reader advances daily. With reminders switched off it falls back to a
@@ -106,6 +107,43 @@ progress and saved ayat are stored against a **scope** and a **verse key**
 
 This is the one deliberate departure from a shelf-of-separate-books model, and
 it is what makes changing translation cost nothing.
+
+### Swiping or scrolling
+
+**Settings → Reading → Moving between ayat** chooses how the Read tab moves
+on. Swiping is the default, and what every reader before the setting had.
+
+**Swipe, one ayah at a time.** The ayat are the pages of a carousel
+(`PageView`): the page follows the finger, the next ayah is already there to
+be revealed, and letting go past halfway — or with a flick — turns it, the way
+a gallery of pictures does. Left carries the reader forward. The pages either
+side are kept built and loaded (`readingPageProvider`), so a swipe never
+reveals an ayah still loading. The arrows, *Mark as read* carrying on and a
+jump from the surah index all slide the same carousel. A page that comes to
+rest becomes the reader's place, and nothing on the way is marked: the
+auto-marking rule above is unchanged, applied to the page on screen.
+
+**Scroll, one after another.** The whole Qur'an as one column, surah after
+surah — each surah headed by its names and, where it has one, the basmala
+taken word for word from the edition's own 1:1. It opens at the reader's place
+and grows in both directions from there (a `CustomScrollView` with a centre
+anchor), so ayat loading above or below never move the one being read.
+
+The scrolling view cannot use "the end has been on screen for five seconds":
+several short ayat are often on screen at once. Instead it measures, per ayah:
+
+| An ayah is marked read when… | |
+|---|---|
+| it has been on screen for its **reading time**, | at the planner's own pace, counting *its* words: 65 a minute for the Arabic, 200 for each translation shown, and never under 3 seconds ([`ReadingPace.timeFor`](lib/domain/services/reading_pace.dart)) |
+| only while the reader is **with the app**, | foreground, on the Read tab, and within two minutes of their last touch or scroll — the same idle rule as reading time |
+| and then **scrolled past**, | all of it above the top of the column |
+
+A flick through the column gives nothing enough time on screen, so marks
+nothing. Each ayah has a tick to mark or unmark it by hand, and an ayah the
+reader unmarks is never marked again by the view in that session. Marking an
+ayah from the column leaves the reader's place where it is; the place itself
+is saved once the column comes to rest. See
+[`ScrollReading`](lib/features/today/scroll_reading.dart).
 
 ## The Qur'an Planner
 
@@ -629,7 +667,7 @@ flutter analyze     # lib, test and tool must be clean
 flutter test
 ```
 
-202 tests cover the reminder cadences and period boundaries, the reading rule
+362 tests cover the reminder cadences and period boundaries, the reading rule
 (including missed days, skipping ahead and unfinished portions), reading-plan
 arithmetic (catch-up, reading ahead, a target that cannot recede, and what
 happens once the date has passed), what a reminder is allowed to say and its
@@ -639,8 +677,11 @@ reading surface in each language mode, transliteration and right-to-left
 translations, word-by-word glosses and the guarantee that they replace the
 running Arabic rather than repeat it, switching translation without losing your
 place, reading the translation aloud (and never the Arabic), auto-marking and
-its guard rails, swipe navigation, the surah index, notification scheduling and
-permission handling, and the full first-run journey end to end.
+its guard rails, the carousel (following the finger, springing back, turning
+past halfway, the arrows), the scrolling view (surah after surah, marking only
+what was read and scrolled past, the tick, keeping the place), the surah
+index, notification scheduling and permission handling, and the full first-run
+journey end to end.
 
 `test/features/main_journey_test.dart` runs the exact scenario the product is
 built around: install → Saheeh International → Arabic + translation → daily at

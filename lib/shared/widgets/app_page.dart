@@ -15,6 +15,7 @@ class AppPage extends StatelessWidget {
     this.actions,
     this.showBackButton = false,
     this.scrollable = true,
+    this.fullBleed = false,
     this.padding,
     super.key,
   });
@@ -33,18 +34,17 @@ class AppPage extends StatelessWidget {
   /// manage their own scrolling.
   final bool scrollable;
 
+  /// When true — and not [scrollable] — the body fills the page edge to edge,
+  /// with no gutter and no cap on its width: for a body that lays out its own,
+  /// like the reading screen, whose pages slide in from the very edge.
+  final bool fullBleed;
+
   final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
     final AppColors colors = context.colors;
-    final EdgeInsetsGeometry effectivePadding = padding ??
-        const EdgeInsets.fromLTRB(
-          AppSpacing.gutter,
-          AppSpacing.sm,
-          AppSpacing.gutter,
-          AppSpacing.xxxl,
-        );
+    final EdgeInsetsGeometry effectivePadding = padding ?? appPageBodyPadding;
 
     final Widget header = Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -105,7 +105,9 @@ class AppPage extends StatelessWidget {
                   ? SingleChildScrollView(
                       child: ReadingColumn(child: body),
                     )
-                  : ReadingColumn(child: body),
+                  : fullBleed
+                      ? child
+                      : ReadingColumn(child: body),
             ),
           ],
         ),
@@ -113,6 +115,15 @@ class AppPage extends StatelessWidget {
     );
   }
 }
+
+/// The padding [AppPage] gives its body: for a full-bleed body to give each of
+/// its own pages, so they read exactly like any other.
+const EdgeInsets appPageBodyPadding = EdgeInsets.fromLTRB(
+  AppSpacing.gutter,
+  AppSpacing.sm,
+  AppSpacing.gutter,
+  AppSpacing.xxxl,
+);
 
 /// Centres content and caps its width so lines never grow uncomfortably long
 /// on tablets or large phones.

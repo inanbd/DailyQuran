@@ -22,6 +22,7 @@ class UserPreferences {
     this.secondaryEditionId,
     this.dailyReadingMinutes = 0,
     this.celebrations = true,
+    this.readingLayout = ReadingLayout.swipe,
   });
 
   /// The daily reading times a reader can choose from, in minutes.
@@ -111,6 +112,10 @@ class UserPreferences {
   /// it off quiets the app without losing anything.
   final bool celebrations;
 
+  /// Whether the Read tab turns one ayah at a time or scrolls through them.
+  /// Swiping by default, which is how every reader before this setting read.
+  final ReadingLayout readingLayout;
+
   UserPreferences copyWith({
     LanguageMode? languageMode,
     bool? showTransliteration,
@@ -125,6 +130,7 @@ class UserPreferences {
     String? secondaryEditionId,
     int? dailyReadingMinutes,
     bool? celebrations,
+    ReadingLayout? readingLayout,
     /// Drops the second translation. Needed because a null
     /// [secondaryEditionId] above means "leave it alone", which would make
     /// turning the second translation back off impossible to express.
@@ -146,6 +152,7 @@ class UserPreferences {
           : secondaryEditionId ?? this.secondaryEditionId,
       dailyReadingMinutes: dailyReadingMinutes ?? this.dailyReadingMinutes,
       celebrations: celebrations ?? this.celebrations,
+      readingLayout: readingLayout ?? this.readingLayout,
     );
   }
 }

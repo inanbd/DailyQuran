@@ -19,6 +19,27 @@ enum LanguageMode {
   }
 }
 
+/// How the Read tab moves from one ayah to the next.
+enum ReadingLayout {
+  /// One ayah to a page, turned by swiping the way a gallery is — or with the
+  /// arrows.
+  swipe('swipe'),
+
+  /// The ayat one after another in a single column, surah after surah.
+  scroll('scroll');
+
+  const ReadingLayout(this.storageKey);
+
+  final String storageKey;
+
+  static ReadingLayout fromStorage(String? value) {
+    return ReadingLayout.values.firstWhere(
+      (ReadingLayout layout) => layout.storageKey == value,
+      orElse: () => ReadingLayout.swipe,
+    );
+  }
+}
+
 /// Appearance preference. Mirrors [ThemeMode] but is persisted by the app.
 enum AppThemeMode {
   system('system'),

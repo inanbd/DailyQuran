@@ -118,6 +118,11 @@ class TestHarness {
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
+        // A test that starts the app again — a restart — must mount a fresh
+        // scope for the new container. Reusing the old one leaves the new
+        // container off Flutter's frame clock, so providers let go on a timer
+        // that outlives the test.
+        key: ObjectKey(container),
         container: container,
         child: const DailyQuranApp(),
       ),

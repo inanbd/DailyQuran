@@ -1,0 +1,3 @@
+Turn the page like a gallery: the ayah follows your finger, the next one is already there, and it settles smoothly into place.
+
+New: read by scrolling. Settings → Reading → Moving between ayat → Scroll, one after another shows the Qur'an as one column, surah after surah. An ayah counts as read once you have spent its reading time with it and scrolled past; flicking through marks nothing, and a tick lets you mark any ayah yourself.

@@ -10,7 +10,6 @@ import 'package:daily_quran/features/settings/notification_settings_screen.dart'
 import 'package:daily_quran/features/settings/reading_settings_screen.dart';
 import 'package:daily_quran/features/settings/settings_screen.dart';
 import 'package:daily_quran/features/today/today_screen.dart';
-import 'package:daily_quran/shared/widgets/ayah_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -212,7 +211,7 @@ void main() {
     expect(find.text('Development data'), findsWidgets);
   });
 
-  testWidgets('swiping turns the page, the way a mushaf does',
+  testWidgets('swiping turns the page, the way a gallery does',
       (WidgetTester tester) async {
     final TestHarness harness = await TestHarness.create(
       initialPreferences: onboarded(),
@@ -222,36 +221,85 @@ void main() {
     expect(find.text('Translation number 1.'), findsOneWidget);
 
     // Swiping right at the start has nowhere to go.
-    await tester.fling(find.byType(AyahView), const Offset(400, 0), 1200);
+    await tester.fling(find.byType(PageView), const Offset(400, 0), 1200);
     await harness.settle(tester);
     expect(find.text('Translation number 1.'), findsOneWidget);
 
     // Left carries the reader forward.
-    await tester.fling(find.byType(AyahView), const Offset(-400, 0), 1200);
+    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1200);
     await harness.settle(tester);
     expect(find.text('Translation number 2.'), findsOneWidget);
+    expect(find.text('Translation number 1.'), findsNothing);
 
     // Right takes them back.
-    await tester.fling(find.byType(AyahView), const Offset(400, 0), 1200);
+    await tester.fling(find.byType(PageView), const Offset(400, 0), 1200);
     await harness.settle(tester);
     expect(find.text('Translation number 1.'), findsOneWidget);
+
+    // Turning pages is browsing: nothing on the way was marked read.
+    expect(find.text('0 of 10 read'), findsOneWidget);
   });
 
-  testWidgets('a slow horizontal drag while reading does not turn the page',
+  testWidgets('the page follows the finger, and settles the way a gallery does',
       (WidgetTester tester) async {
     final TestHarness harness = await TestHarness.create(
       initialPreferences: onboarded(),
     );
     await harness.pumpApp(tester);
 
-    // Far enough to move a page, but far too slow to be a flick.
+    // Partway through a drag, both ayat are on screen at once: the next page
+    // slides in beneath the finger rather than appearing when it lifts.
+    final TestGesture gesture =
+        await tester.startGesture(tester.getCenter(find.byType(PageView)));
+    await gesture.moveBy(const Offset(-40, 0));
+    await gesture.moveBy(const Offset(-200, 0));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+    expect(find.text('Translation number 1.'), findsOneWidget);
+    expect(find.text('Translation number 2.'), findsOneWidget);
+
+    // Let go short of halfway, slowly, and it springs back.
+    await tester.pump(const Duration(seconds: 1));
+    await gesture.up();
+    await harness.settle(tester);
+    expect(find.text('Translation number 1.'), findsOneWidget);
+    expect(find.text('Translation number 2.'), findsNothing);
+
+    // Past halfway, however slowly, and the page turns.
     await tester.timedDrag(
-      find.byType(AyahView),
-      const Offset(-400, 0),
-      const Duration(seconds: 4),
+      find.byType(PageView),
+      const Offset(-500, 0),
+      const Duration(seconds: 2),
     );
     await harness.settle(tester);
+    expect(find.text('Translation number 2.'), findsOneWidget);
 
+    // A long drag is a long run of touches, each of them reading time to
+    // record; let that finish before the test does.
+    await harness.settle(tester);
+  });
+
+  testWidgets('the arrows slide the carousel, and Mark as read carries on',
+      (WidgetTester tester) async {
+    final TestHarness harness = await TestHarness.create(
+      initialPreferences: onboarded(),
+    );
+    await harness.pumpApp(tester);
+
+    await tester.tap(find.byTooltip('Next ayah'));
+    await harness.settle(tester);
+    expect(find.text('Translation number 2.'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Previous ayah'));
+    await harness.settle(tester);
     expect(find.text('Translation number 1.'), findsOneWidget);
+
+    // The Daily Ayah is one ayah, so reading it stays on it...
+    await harness.tapButton(tester, 'Mark as read');
+    expect(find.text('Translation number 1.'), findsOneWidget);
+    expect(find.text('1 of 10 read'), findsOneWidget);
   });
 }

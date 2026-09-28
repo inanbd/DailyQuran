@@ -12,6 +12,7 @@ import '../../app/speech_providers.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/utils/formatting.dart';
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/enums.dart';
 import '../../domain/entities/quran_edition.dart';
 import '../../domain/entities/reading_progress.dart';
 import '../../domain/entities/reading_track.dart';
@@ -29,6 +30,7 @@ import '../../shared/widgets/notice_banner.dart';
 import '../../shared/widgets/progress_bar.dart';
 import '../../shared/widgets/state_views.dart';
 import 'editions_sheet.dart';
+import 'scroll_reading.dart';
 import 'surahs_sheet.dart';
 import 'today_controller.dart';
 
@@ -118,12 +120,24 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           actions: <Widget>[
             _SurahsButton(editionId: state.value?.edition?.id),
           ],
+          // The body lays itself out: the pages of the carousel slide in from
+          // the very edge, and the scrolling view scrolls on its own.
+          scrollable: false,
+          fullBleed: true,
           child: state.when(
-            loading: () => const LoadingView(),
+            // Keeps a reading on screen while it reloads — a new translation,
+            // a setting changed elsewhere — rather than blanking the carousel.
+            // With nothing yet to keep, as right after onboarding, the reader
+            // is shown it is loading.
+            skipLoadingOnReload: state.value?.hasEdition ?? false,
+            loading: () => const _Padded(child: LoadingView()),
             error: (Object error, StackTrace stack) =>
-                _TodayError(error: error),
-            data: (TodayState value) =>
-                _TodayBody(state: value, endOfAyahKey: _endOfAyah),
+                _Padded(child: _TodayError(error: error)),
+            data: (TodayState value) => _TodayBody(
+              state: value,
+              layout: preferences.readingLayout,
+              endOfAyahKey: _endOfAyah,
+            ),
           ),
         ),
       ),
@@ -138,6 +152,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   /// withdraw it.
   void _considerAutoMark() {
     if (!mounted) return;
+    // The scrolling view keeps its own count of what has been read.
+    if (ref.read(userPreferencesProvider).readingLayout != ReadingLayout.swipe) {
+      return;
+    }
 
     final TodayState? current = ref.read(todayControllerProvider).value;
     final Ayah? ayah = current?.ayah;
@@ -146,6 +164,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     if (_armedFor == ayah.id) return;
     if (!_hasReachedEnd()) return;
 
+    // The page can move on before a rebuild retires the last ayah's timer —
+    // a swipe lands between frames — so it is retired here too, rather than
+    // left running with nothing to cancel it.
+    _dwell?.cancel();
     _armedFor = ayah.id;
     _dwell = Timer(TodayScreen.dwell, () => _markRead(ayah.id));
   }
@@ -211,40 +233,350 @@ class _SurahsButton extends ConsumerWidget {
   }
 }
 
+/// A body that is not a page of the reading — loading, an error, the finished
+/// Qur'an — laid out the way any other screen's is.
+class _Padded extends StatelessWidget {
+  const _Padded({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: ReadingColumn(
+        child: Padding(padding: appPageBodyPadding, child: child),
+      ),
+    );
+  }
+}
+
+/// Everything the Read tab can show once it has loaded: nothing chosen yet,
+/// the finished Qur'an, or the reading itself, one ayah at a time or as one
+/// continuous column.
 class _TodayBody extends ConsumerWidget {
-  const _TodayBody({required this.state, required this.endOfAyahKey});
+  const _TodayBody({
+    required this.state,
+    required this.layout,
+    required this.endOfAyahKey,
+  });
 
   final TodayState state;
+  final ReadingLayout layout;
 
-  /// Attached to the end of the ayah, so the screen above can tell when the
-  /// reader has scrolled all the way through it.
+  /// Attached to the end of the ayah on screen, so the screen above can tell
+  /// when the reader has scrolled all the way through it.
   final Key endOfAyahKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final QuranEdition? edition = state.edition;
-    if (edition == null) return const _NoEditionChosen();
+    if (edition == null) return const _Padded(child: _NoEditionChosen());
 
     if (state.isComplete) {
-      return CompletionView(
-        edition: edition,
-        progress: state.progress!,
-        isPlan: state.isPlan,
-        onReadAgain: () => ref.read(todayControllerProvider.notifier).restart(),
-        onChooseAnother: () => context.go(Routes.library),
+      return _Padded(
+        child: CompletionView(
+          edition: edition,
+          progress: state.progress!,
+          isPlan: state.isPlan,
+          onReadAgain: () =>
+              ref.read(todayControllerProvider.notifier).restart(),
+          onChooseAnother: () => context.go(Routes.library),
+        ),
       );
     }
 
-    final Ayah? ayah = state.ayah;
-    if (ayah == null) {
-      return ErrorStateView(
-        title: 'This ayah could not be loaded',
-        message: 'The text for position ${state.ordinal} is missing from local '
-            'storage. Reinstalling the edition usually fixes this.',
-        onRetry: () => ref.read(todayControllerProvider.notifier).refresh(),
+    if (state.ayah == null) {
+      return _Padded(
+        child: ErrorStateView(
+          title: 'This ayah could not be loaded',
+          message:
+              'The text for position ${state.ordinal} is missing from local '
+              'storage. Reinstalling the edition usually fixes this.',
+          onRetry: () => ref.read(todayControllerProvider.notifier).refresh(),
+        ),
       );
     }
 
+    final UserPreferences preferences = ref.watch(userPreferencesProvider);
+    if (layout == ReadingLayout.scroll) {
+      return ScrollReading(
+        // A new column whenever what it shows changes shape — another
+        // translation, another reading, text of another size — opened afresh
+        // at the reader's place rather than left at an offset that now points
+        // somewhere else.
+        key: ValueKey<String>(<Object?>[
+          state.scope,
+          edition.id,
+          state.secondaryEdition?.id,
+          preferences.languageMode,
+          preferences.textSize,
+          preferences.showWordByWord,
+          preferences.showTransliteration,
+        ].join('|')),
+        state: state,
+      );
+    }
+
+    return _PagedReading(
+      // Another reading, or an edition of another length, is another set of
+      // pages; a new translation of the same ayat keeps the carousel as it is.
+      key: ValueKey<String>('${state.scope}|${state.total}'),
+      state: state,
+      endOfAyahKey: endOfAyahKey,
+    );
+  }
+}
+
+/// The ayat as the pages of a carousel: each slides in from the edge beneath
+/// the reader's finger, the next one already there to be revealed, the way a
+/// gallery of pictures turns — left carries the reader forward, right back.
+///
+/// Turning the page is browsing, not reading, as it always was: a page that
+/// comes to rest becomes the reader's place and nothing on the way is marked.
+/// The arrows, *Mark as read* carrying on to the next ayah, and a jump from the
+/// surah index all slide the carousel the same way a finger does.
+class _PagedReading extends ConsumerStatefulWidget {
+  const _PagedReading({
+    required this.state,
+    required this.endOfAyahKey,
+    super.key,
+  });
+
+  final TodayState state;
+  final Key endOfAyahKey;
+
+  /// How long a page takes to slide into place when the app turns it.
+  static const Duration turn = Duration(milliseconds: 320);
+
+  @override
+  ConsumerState<_PagedReading> createState() => _PagedReadingState();
+}
+
+class _PagedReadingState extends ConsumerState<_PagedReading> {
+  late final PageController _pages =
+      PageController(initialPage: widget.state.ordinal - 1);
+
+  /// The position a swipe has asked the controller for and the page does not
+  /// yet show. Until it does, the carousel does not chase the place the page
+  /// had before — which would slide it straight back under the reader's
+  /// finger.
+  int? _awaiting;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_PagedReading oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state.ordinal != widget.state.ordinal) {
+      // After this frame: a page cannot be moved while it is being built.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
+    }
+  }
+
+  /// Brings the carousel to the reader's place when something other than a
+  /// swipe moved it: the next ayah after *Mark as read*, the surah index, a
+  /// new day's reading.
+  void _follow() {
+    if (!mounted || !_pages.hasClients || _awaiting != null) return;
+    // Never pulled out from under a finger that is still on it.
+    if (_pages.position.isScrollingNotifier.value) return;
+    final int target = widget.state.ordinal - 1;
+    final int shown = (_pages.page ?? target.toDouble()).round();
+    if (shown == target) return;
+    if ((shown - target).abs() == 1) {
+      _pages.animateToPage(
+        target,
+        duration: _PagedReading.turn,
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      // Further than a page: a slide through everything in between would be
+      // a blur, and the place is the point.
+      _pages.jumpToPage(target);
+    }
+  }
+
+  /// Makes the page the carousel came to rest on the reader's place.
+  bool _onScroll(ScrollNotification notification) {
+    // Only the carousel's own sideways movement, not an ayah being scrolled
+    // through inside a page.
+    if (notification.depth != 0 ||
+        notification.metrics.axis != Axis.horizontal ||
+        notification is! ScrollEndNotification) {
+      return false;
+    }
+    final int ordinal = (_pages.page ?? 0).round() + 1;
+    if (ordinal != widget.state.ordinal) unawaited(_settleOn(ordinal));
+    return false;
+  }
+
+  Future<void> _settleOn(int ordinal) async {
+    _awaiting = ordinal;
+    await ref.read(todayControllerProvider.notifier).goTo(ordinal);
+    if (_awaiting != ordinal) return;
+    _awaiting = null;
+    // Something else may have moved the place in the meantime.
+    if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
+  }
+
+  /// Slides to [ordinal], as the arrows do.
+  void _turnTo(int ordinal) {
+    if (!_pages.hasClients) return;
+    _pages.animateToPage(
+      ordinal - 1,
+      duration: _PagedReading.turn,
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// Makes [ordinal] the reader's place first, when a page still sliding in
+  /// is acted on, so what is done is done to the ayah on that page.
+  Future<void> _onPage(int ordinal, Future<void> Function() action) async {
+    if (ordinal != widget.state.ordinal) await _settleOn(ordinal);
+    await action();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final TodayState state = widget.state;
+    final TodayController controller =
+        ref.read(todayControllerProvider.notifier);
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: PageView.builder(
+        controller: _pages,
+        itemCount: state.total,
+        // The pages either side stay built, so a swipe reveals an ayah that is
+        // already there rather than one still loading.
+        allowImplicitScrolling: true,
+        itemBuilder: (BuildContext context, int index) {
+          final int ordinal = index + 1;
+          return _AyahPage(
+            state: state,
+            ordinal: ordinal,
+            endOfAyahKey:
+                ordinal == state.ordinal ? widget.endOfAyahKey : null,
+            onPrevious: ordinal > 1 ? () => _turnTo(ordinal - 1) : null,
+            onNext: ordinal < state.total ? () => _turnTo(ordinal + 1) : null,
+            onMarkRead: () => _onPage(ordinal, controller.markRead),
+            onMarkUnread: () => _onPage(ordinal, controller.markUnread),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// One page of the carousel: an ayah with its place in the Qur'an, how the
+/// reading is going, and the controls to read on.
+///
+/// The page the reader's place is on is drawn from the controller's state;
+/// the pages either side, which a swipe shows before it comes to rest, load
+/// their own ayah.
+class _AyahPage extends ConsumerWidget {
+  const _AyahPage({
+    required this.state,
+    required this.ordinal,
+    required this.endOfAyahKey,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onMarkRead,
+    required this.onMarkUnread,
+  });
+
+  final TodayState state;
+  final int ordinal;
+  final Key? endOfAyahKey;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final VoidCallback onMarkRead;
+  final VoidCallback onMarkUnread;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final QuranEdition edition = state.edition!;
+
+    final Ayah? ayah;
+    final Ayah? secondaryAyah;
+    final bool isRead;
+    if (ordinal == state.ordinal) {
+      ayah = state.ayah;
+      secondaryAyah = state.secondaryAyah;
+      isRead = state.isRead;
+    } else {
+      final ReadingPage? page = ref
+          .watch(
+            readingPageProvider((
+              editionId: edition.id,
+              secondaryId: state.secondaryEdition?.id,
+              scope: state.scope!,
+              ordinal: ordinal,
+            )),
+          )
+          .value;
+      ayah = page?.ayah;
+      secondaryAyah = page?.secondaryAyah;
+      isRead = page?.isRead ?? false;
+    }
+
+    return SingleChildScrollView(
+      child: ReadingColumn(
+        child: Padding(
+          padding: appPageBodyPadding,
+          child: ayah == null
+              // A page still loading keeps its shape, so nothing jumps when
+              // its ayah arrives.
+              ? const SizedBox(height: 320)
+              : _AyahPageBody(
+                  state: state,
+                  edition: edition,
+                  ayah: ayah,
+                  secondaryAyah: secondaryAyah,
+                  isRead: isRead,
+                  endOfAyahKey: endOfAyahKey,
+                  onPrevious: onPrevious,
+                  onNext: onNext,
+                  onMarkRead: onMarkRead,
+                  onMarkUnread: onMarkUnread,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AyahPageBody extends ConsumerWidget {
+  const _AyahPageBody({
+    required this.state,
+    required this.edition,
+    required this.ayah,
+    required this.secondaryAyah,
+    required this.isRead,
+    required this.endOfAyahKey,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onMarkRead,
+    required this.onMarkUnread,
+  });
+
+  final TodayState state;
+  final QuranEdition edition;
+  final Ayah ayah;
+  final Ayah? secondaryAyah;
+  final bool isRead;
+  final Key? endOfAyahKey;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final VoidCallback onMarkRead;
+  final VoidCallback onMarkUnread;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final UserPreferences preferences = ref.watch(userPreferencesProvider);
     final SpokenUtterance? speaking = ref.watch(speechControllerProvider);
     // A device with no voice for this translation's language gets no play
@@ -253,109 +585,81 @@ class _TodayBody extends ConsumerWidget {
         ref.watch(speechAvailableProvider(edition.languageCode)).value ?? false;
     final bool isFavourite = ref.watch(isFavouriteProvider(ayah)).value ?? false;
     final ReadingProgress progress = state.progress!;
+    final QuranEdition? second = state.secondaryEdition;
 
-    return GestureDetector(
-      // Horizontal only, so the page still scrolls vertically — the gesture
-      // arena decides which axis the reader actually moved along. Opaque so a
-      // swipe works anywhere on the page, including the margins; taps still
-      // reach the buttons, which are hit-tested first.
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragEnd: (DragEndDetails details) =>
-          _onSwipe(ref, details.primaryVelocity ?? 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          _AyahMeta(edition: edition, ayah: ayah),
-          if (edition.isFixture) ...<Widget>[
-            const SizedBox(height: AppSpacing.lg),
-            const NoticeBanner(
-              tone: NoticeTone.warning,
-              title: 'Development data',
-              message:
-                  'This is placeholder text for building and testing the app — '
-                  'not the Qur’an. Import a verified edition to read real '
-                  'content.',
-            ),
-          ],
-          const SizedBox(height: AppSpacing.xl),
-          // A gentle cross-fade when the ayah changes, keyed so the animation
-          // runs on content change rather than on every rebuild.
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 240),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            child: AyahView(
-              key: ValueKey<String>(ayah.id),
-              ayah: ayah,
-              languageMode: preferences.languageMode,
-              textScale: preferences.textSize.scale,
-              showTransliteration: preferences.showTransliteration,
-              showWordByWord: preferences.showWordByWord,
-              translationIsRightToLeft: edition.isRightToLeft,
-              // Today shows one ayah at a time, so the citation below it only
-              // repeats what the screen already says.
-              showReference: false,
-              secondaryTranslation: state.hasSecondTranslation
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _AyahMeta(edition: edition, ayah: ayah),
+        if (edition.isFixture) ...<Widget>[
+          const SizedBox(height: AppSpacing.lg),
+          const NoticeBanner(
+            tone: NoticeTone.warning,
+            title: 'Development data',
+            message:
+                'This is placeholder text for building and testing the app — '
+                'not the Qur’an. Import a verified edition to read real '
+                'content.',
+          ),
+        ],
+        const SizedBox(height: AppSpacing.xl),
+        AyahView(
+          key: ValueKey<String>(ayah.id),
+          ayah: ayah,
+          languageMode: preferences.languageMode,
+          textScale: preferences.textSize.scale,
+          showTransliteration: preferences.showTransliteration,
+          showWordByWord: preferences.showWordByWord,
+          translationIsRightToLeft: edition.isRightToLeft,
+          // One ayah to a page, so the citation below it only repeats what the
+          // page already says.
+          showReference: false,
+          secondaryTranslation:
+              second != null && (secondaryAyah?.hasTranslation ?? false)
                   ? SecondaryTranslation(
-                      text: state.secondaryAyah!.translationText!,
-                      title: state.secondaryEdition!.titleEnglish,
-                      isRightToLeft: state.secondaryEdition!.isRightToLeft,
+                      text: secondaryAyah!.translationText!,
+                      title: second.titleEnglish,
+                      isRightToLeft: second.isRightToLeft,
                     )
                   : null,
-              onSpeakTranslation: canSpeak
-                  ? () => ref.read(speechControllerProvider.notifier).toggle(
-                        ayah.id,
-                        ayah.translationText ?? '',
-                        languageCode: edition.languageCode,
-                      )
-                  : null,
-              isSpeakingTranslation: speaking ==
-                  SpokenUtterance(
-                    ayahId: ayah.id,
+          onSpeakTranslation: canSpeak
+              ? () => ref.read(speechControllerProvider.notifier).toggle(
+                    ayah.id,
+                    ayah.translationText ?? '',
                     languageCode: edition.languageCode,
-                  ),
-              isFavourite: isFavourite,
-              onToggleFavourite: () =>
-                  ref.read(favouritesControllerProvider.notifier).toggle(ayah),
-            ),
-          ),
-          // Nothing to look at: the point past which the whole ayah, citation
-          // included, has been on screen.
-          SizedBox(key: endOfAyahKey, height: AppSpacing.xxl),
-          if (state.isPlan && state.portion != null) ...<Widget>[
-            _GoalCard(portion: state.portion!),
-            const SizedBox(height: AppSpacing.lg),
-          ],
-          ReadingProgressBar(
-            read: progress.totalRead,
-            total: progress.totalAyah,
-          ),
-          const ReadingTimeGoalBar(),
-          const SizedBox(height: AppSpacing.xl),
-          _ReadingActions(state: state),
+                  )
+              : null,
+          isSpeakingTranslation: speaking ==
+              SpokenUtterance(
+                ayahId: ayah.id,
+                languageCode: edition.languageCode,
+              ),
+          isFavourite: isFavourite,
+          onToggleFavourite: () =>
+              ref.read(favouritesControllerProvider.notifier).toggle(ayah),
+        ),
+        // Nothing to look at: the point past which the whole ayah, citation
+        // included, has been on screen.
+        SizedBox(key: endOfAyahKey, height: AppSpacing.xxl),
+        if (state.isPlan && state.portion != null) ...<Widget>[
+          _GoalCard(portion: state.portion!),
+          const SizedBox(height: AppSpacing.lg),
         ],
-      ),
+        ReadingProgressBar(
+          read: progress.totalRead,
+          total: progress.totalAyah,
+        ),
+        const ReadingTimeGoalBar(),
+        const SizedBox(height: AppSpacing.xl),
+        _ReadingActions(
+          isRead: isRead,
+          onPrevious: onPrevious,
+          onNext: onNext,
+          onMarkRead: onMarkRead,
+          onMarkUnread: onMarkUnread,
+        ),
+      ],
     );
-  }
-
-  /// Minimum flick speed, in logical pixels per second, that counts as a page
-  /// turn. High enough that a slow drag while reading does not move the page.
-  static const double _swipeVelocity = 300;
-
-  /// Turns the page on a flick, the way a mushaf does: left carries the reader
-  /// forward, right goes back.
-  ///
-  /// The buttons remain the primary control — this is an accelerator, and it
-  /// respects exactly the same limits at either end.
-  void _onSwipe(WidgetRef ref, double velocity) {
-    if (velocity.abs() < _swipeVelocity) return;
-    final TodayController controller =
-        ref.read(todayControllerProvider.notifier);
-    if (velocity < 0) {
-      if (state.hasNext) controller.goToNext();
-    } else {
-      if (state.hasPrevious) controller.goToPrevious();
-    }
   }
 }
 
@@ -533,15 +837,26 @@ class _AyahMeta extends StatelessWidget {
 }
 
 /// Previous · Mark as read · Next.
-class _ReadingActions extends ConsumerWidget {
-  const _ReadingActions({required this.state});
+///
+/// The arrows turn the page the way a swipe does, so they are handed in by
+/// the carousel rather than moving the reading behind its back.
+class _ReadingActions extends StatelessWidget {
+  const _ReadingActions({
+    required this.isRead,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onMarkRead,
+    required this.onMarkUnread,
+  });
 
-  final TodayState state;
+  final bool isRead;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final VoidCallback onMarkRead;
+  final VoidCallback onMarkUnread;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final TodayController controller =
-        ref.read(todayControllerProvider.notifier);
+  Widget build(BuildContext context) {
     final AppColors colors = context.colors;
 
     return Row(
@@ -549,18 +864,18 @@ class _ReadingActions extends ConsumerWidget {
         _NavButton(
           icon: Icons.chevron_left,
           tooltip: 'Previous ayah',
-          onPressed: state.hasPrevious ? controller.goToPrevious : null,
+          onPressed: onPrevious,
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-          child: state.isRead
+          child: isRead
               ? OutlinedButton.icon(
-                  onPressed: controller.markUnread,
+                  onPressed: onMarkUnread,
                   icon: Icon(Icons.check, size: 18, color: colors.accent),
                   label: const Text('Read'),
                 )
               : FilledButton(
-                  onPressed: controller.markRead,
+                  onPressed: onMarkRead,
                   child: const Text('Mark as read'),
                 ),
         ),
@@ -568,7 +883,7 @@ class _ReadingActions extends ConsumerWidget {
         _NavButton(
           icon: Icons.chevron_right,
           tooltip: 'Next ayah',
-          onPressed: state.hasNext ? controller.goToNext : null,
+          onPressed: onNext,
         ),
       ],
     );

@@ -78,6 +78,22 @@ class ReadingSettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
           SettingsGroup(
+            title: 'Moving between ayat',
+            children: <Widget>[
+              for (final ReadingLayout layout in ReadingLayout.values)
+                ChoiceRow<ReadingLayout>(
+                  label: _layoutLabel(layout),
+                  description: _layoutDescription(layout),
+                  value: layout,
+                  groupValue: preferences.readingLayout,
+                  onChanged: (ReadingLayout value) => ref
+                      .read(userPreferencesProvider.notifier)
+                      .update(preferences.copyWith(readingLayout: value)),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          SettingsGroup(
             title: 'Ayah text',
             children: <Widget>[
               for (final LanguageMode mode in LanguageMode.values)
@@ -142,6 +158,27 @@ class ReadingSettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  static String _layoutLabel(ReadingLayout layout) {
+    switch (layout) {
+      case ReadingLayout.swipe:
+        return 'Swipe, one ayah at a time';
+      case ReadingLayout.scroll:
+        return 'Scroll, one after another';
+    }
+  }
+
+  static String _layoutDescription(ReadingLayout layout) {
+    switch (layout) {
+      case ReadingLayout.swipe:
+        return 'Each ayah on a page of its own. Swipe to turn the page, the '
+            'way a gallery turns, or use the arrows.';
+      case ReadingLayout.scroll:
+        return 'The ayat in one column, surah after surah. An ayah counts as '
+            'read once you have spent its reading time with it and scrolled '
+            'on — or tap its tick.';
+    }
   }
 
   static String? _description(LanguageMode mode) {

@@ -8,7 +8,9 @@
 //
 //  * The Play Store screenshots (1080 x 2160) as 600 x 1200 JPEGs: never shown wider
 //    than about 300 pixels, so this is still sharp on a 2x screen, at a
-//    fraction of the download.
+//    fraction of the download. A screenshot of the same name in
+//    website/art/screens is used in its place — how the site shows something
+//    the store listing does not.
 //  * The 512px store icon at the sizes browsers and search results ask for.
 
 using System.Drawing;
@@ -16,6 +18,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 
 string screens = "fastlane/metadata/android/en-US/images/phoneScreenshots";
+string siteScreens = "website/art/screens";
 string icon = "fastlane/metadata/android/en-US/images/icon.png";
 string output = "website/src/DailyQuran.Web/wwwroot/img";
 
@@ -27,8 +30,11 @@ if (!Directory.Exists(screens))
 
 foreach (string file in Directory.GetFiles(screens, "*.png"))
 {
-    string target = Path.Combine(output, "screens", Path.ChangeExtension(Path.GetFileName(file), ".jpg"));
-    Resize(file, target, 600, 1200);
+    string name = Path.GetFileName(file);
+    string own = Path.Combine(siteScreens, name);
+    string source = File.Exists(own) ? own : file;
+    string target = Path.Combine(output, "screens", Path.ChangeExtension(name, ".jpg"));
+    Resize(source, target, 600, 1200);
 }
 
 foreach (int size in new[] { 96, 180, 192 })

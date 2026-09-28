@@ -22,6 +22,8 @@ public sealed class SiteOptions
 
     public SiteVerification Verification { get; set; } = new();
 
+    public SiteAnalytics Analytics { get; set; } = new();
+
     public string AbsoluteUrl(HttpRequest request, string path)
     {
         string origin = BaseUrl.Length > 0
@@ -63,6 +65,29 @@ public sealed class SiteVerification
     public string Google { get; set; } = "";
 
     public string Bing { get; set; } = "";
+}
+
+/// <summary>
+/// Google Analytics for the website — the app has none. Off while
+/// <see cref="GoogleMeasurementId"/> is empty.
+/// </summary>
+public sealed partial class SiteAnalytics
+{
+    /// <summary>The GA4 measurement ID, e.g. <c>G-T4PP77VBM8</c>.</summary>
+    public string GoogleMeasurementId { get; set; } = "";
+
+    /// <summary>
+    /// The measurement ID, when it is one. It is written into a script and a
+    /// URL, so anything else — a typo, a stray quote — turns analytics off
+    /// rather than going on the page.
+    /// </summary>
+    public string? MeasurementId =>
+        MeasurementIdShape().IsMatch(GoogleMeasurementId.Trim()) ? GoogleMeasurementId.Trim() : null;
+
+    public bool IsEnabled => MeasurementId is not null;
+
+    [System.Text.RegularExpressions.GeneratedRegex("^G-[A-Z0-9]{4,20}$")]
+    private static partial System.Text.RegularExpressions.Regex MeasurementIdShape();
 }
 
 /// <summary>The <c>Quran</c> section of appsettings.json.</summary>

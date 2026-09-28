@@ -74,6 +74,22 @@ public sealed class SiteWithAppStoreFactory : SiteFactory
     };
 }
 
+/// <summary>The site with Google Analytics turned off, or given something that is not a measurement ID.</summary>
+public class SiteWithoutAnalyticsFactory : SiteFactory
+{
+    protected virtual string MeasurementId => "";
+
+    protected override IDictionary<string, string?> Settings => new Dictionary<string, string?>(base.Settings)
+    {
+        ["Site:Analytics:GoogleMeasurementId"] = MeasurementId,
+    };
+}
+
+public sealed class SiteWithBadAnalyticsIdFactory : SiteWithoutAnalyticsFactory
+{
+    protected override string MeasurementId => "G-123'); alert('x";
+}
+
 /// <summary>The site once the app is public on Google Play.</summary>
 public sealed class SiteLiveFactory : SiteFactory
 {
@@ -113,4 +129,8 @@ public static partial class Html
     }
 
     public static int Count(string html, string fragment) => Regex.Matches(html, Regex.Escape(fragment)).Count;
+
+    /// <summary>The nonce a response's Content Security Policy allows scripts by.</summary>
+    public static string HiddenNonce(HttpResponseMessage response) =>
+        Regex.Match(response.Headers.GetValues("Content-Security-Policy").Single(), "'nonce-([^']+)'").Groups[1].Value;
 }

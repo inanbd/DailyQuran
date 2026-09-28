@@ -1,16 +1,28 @@
 @page "/privacy"
 @inject SiteContent SiteText
 @{
+    bool analytics = SiteSettings.Value.Analytics.IsEnabled;
     ViewData["Title"] = "Privacy";
-    ViewData["Description"] = "Daily Quran collects no personal information: no account, no ads, no analytics. The privacy policy for the app and this website.";
+    ViewData["Description"] = analytics
+        ? "The Daily Quran app collects no personal information: no account, no ads, no analytics. This website counts its visits with Google Analytics. The privacy policy for both."
+        : "Daily Quran collects no personal information: no account, no ads, no analytics. The privacy policy for the app and this website.";
     ViewData["Canonical"] = "/privacy";
 }
 
 <section class="band page-hero" aria-labelledby="page-title">
     <div class="container narrow center">
         <p class="eyebrow centered">Privacy</p>
-        <h1 id="page-title">Nothing about you leaves your hands</h1>
-        <p class="lead">No account, no advertising, no analytics — in the app or on this website.</p>
+        <h1 id="page-title">What we keep, and what we don’t</h1>
+        <p class="lead">
+            @if (analytics)
+            {
+                <text>The app keeps nothing about you, anywhere but your phone. This website has no account and no advertising, and counts its visits with Google Analytics.</text>
+            }
+            else
+            {
+                <text>No account, no advertising, no analytics — in the app or on this website.</text>
+            }
+        </p>
     </div>
 </section>
 
@@ -18,19 +30,41 @@
     <div class="container narrow">
         <article class="prose">
             <h2>This website</h2>
-            <p>
-                This website has no accounts, no advertising and no analytics, and it makes no requests
-                to anyone else: its fonts and images are served from here.
-            </p>
+            @if (analytics)
+            {
+                <p>
+                    This website has no accounts and no advertising. Its fonts and images are served from
+                    here; the one thing it asks of anyone else is Google Analytics, below.
+                </p>
+            }
+            else
+            {
+                <p>
+                    This website has no accounts, no advertising and no analytics, and it makes no requests
+                    to anyone else: its fonts and images are served from here.
+                </p>
+            }
             <ul>
+                @if (analytics)
+                {
+                    <li>
+                        <strong>Google Analytics</strong> tells us how many people visit and which pages they
+                        read. It sets cookies (<code>_ga</code> and <code>_ga_…</code>) and sends Google the
+                        pages you view, your browser and device, your approximate location worked out from your
+                        IP address, and how you arrived. We see totals and trends, never who you are. Read
+                        <a href="https://policies.google.com/technologies/partner-sites">how Google uses this
+                        information</a>, or turn it off with Google’s
+                        <a href="https://tools.google.com/dlpage/gaoptout">opt-out browser add-on</a>.
+                    </li>
+                }
                 <li>
                     <strong>Your reading settings</strong> — text size, typeface, theme, and the place you last
                     read — are kept in your own browser, and never sent to us.
                 </li>
                 <li>
-                    <strong>One small cookie</strong>, <code>dq_reader</code>, remembers the translation you chose
-                    and whether you read word by word, so the next surah opens the same way. It is set only
-                    when you change one of those, and holds nothing else.
+                    <strong>One small cookie of our own</strong>, <code>dq_reader</code>, remembers the
+                    translation you chose and whether you read word by word, so the next surah opens the same
+                    way. It is set only when you change one of those, and holds nothing else.
                 </li>
                 <li>
                     <strong>The contact form</strong> sets a security cookie to protect the form from forgery.

@@ -2,8 +2,9 @@
 
 The app's public site: what Daily Quran does, with screenshots and download
 links, the whole Qur'an to read in every edition the app ships, a contact form
-that emails you, and the privacy policy. No accounts, no analytics, and no
-requests to anyone else — fonts and images are served from the site itself.
+that emails you, and the privacy policy. No accounts, and nothing asked of
+anyone else but Google Analytics, which one setting turns off — fonts and
+images are served from the site itself.
 
 ASP.NET Core 10, Razor Pages. The Qur'an is read into memory at startup from
 the app's own `assets/data`, so every page after that is served without
@@ -88,6 +89,28 @@ as environment variables and restart it instead.
   and link previews. Empty uses whatever address each request arrived on.
 - **`SourceCodeUrl`** — the GitHub repository; its issue tracker is offered on
   the contact page and in the footer. Empty hides both.
+
+### Analytics
+
+```json
+"Site": {
+  "Analytics": {
+    "GoogleMeasurementId": "G-T4PP77VBM8"
+  }
+}
+```
+
+The Google tag goes first in every page's `<head>`, and the Content Security
+Policy opens to Google's hosts for it. Empty the ID — or set
+`Site__Analytics__GoogleMeasurementId` to an empty string — and all of it goes:
+the tag, the hosts in the policy, and the paragraph about Google Analytics on
+`/privacy`, which then says the site has no analytics. Anything that is not a
+`G-…` measurement ID is treated as empty, so a typo cannot put anything else
+on the page. Like the other `Site` settings, a change shows on the next page
+load.
+
+Visitors in the EU and UK must agree before analytics cookies are set. The
+site does not ask yet; see Google's Consent Mode if it needs to.
 
 ### Search engines
 
@@ -225,7 +248,10 @@ Two things are copies, and need refreshing by hand:
   browsers ask for. When the store images change, run
   `dotnet run website/tools/prepare-images.cs` from the repository root (on
   Windows) to make them again; `PhoneShot.cs` describes each screenshot for
-  screen readers.
+  screen readers. A 1080 × 2160 screenshot in `website/art/screens/` with a
+  store screenshot's name is used in its place: the site's reading screen is
+  the app at Ali 'Imran 3:134 (`1_read.png`), while the store listing keeps
+  its own.
 - **Fonts** — self-hosted from Google Fonts, all under the SIL Open Font
   License. `tools/fetch-fonts.ps1 -OutDir src/DailyQuran.Web/wwwroot/fonts`
   downloads them again and rewrites `fonts.css`.
@@ -236,8 +262,10 @@ guidelines allow for linking to an app's listing.
 ## Security
 
 - A strict Content Security Policy: scripts, styles, fonts and images from
-  this origin only, with one inline script (the theme, applied before first
-  paint) allowed by a per-request nonce.
+  this origin only, with the inline scripts (the theme, applied before first
+  paint, and Google Analytics' configuration) allowed by a per-request nonce.
+  With analytics on, Google's tag and measurement hosts are allowed as well —
+  exactly those Google documents for GA4, and nothing more.
 - Antiforgery tokens on the contact form, and its page is never compressed —
   a secret token beside text the visitor typed is what BREACH exploits.
 - One cookie, `dq_reader`, remembering the reader's edition and word-by-word

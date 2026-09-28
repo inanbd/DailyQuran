@@ -17,6 +17,17 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    @if (site.Analytics.MeasurementId is { } measurementId)
+    {
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=@measurementId" nonce="@nonce"></script>
+        <script nonce="@nonce">
+            window.dataLayer = window.dataLayer || [];
+            function gtag() { dataLayer.push(arguments); }
+            gtag('js', new Date());
+            gtag('config', '@measurementId');
+        </script>
+    }
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>@title</title>
     <meta name="description" content="@description">
@@ -166,7 +177,7 @@
             </nav>
         </div>
         <div class="container footer-bottom">
-            <p>© @DateTime.UtcNow.Year @site.Publisher · No account, no ads, no tracking.</p>
+            <p>© @DateTime.UtcNow.Year @site.Publisher · The app: no account, no ads, no tracking. <a href="/privacy">Privacy</a></p>
             <p>Qur’an text and translations from <a href="/sources">quran-json</a>, shared under CC BY-SA 4.0.</p>
         </div>
     </footer>

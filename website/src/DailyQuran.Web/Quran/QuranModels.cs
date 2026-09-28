@@ -73,6 +73,9 @@ public sealed partial record Edition(
 
     public string Direction => IsRightToLeft ? "rtl" : "ltr";
 
+    /// <summary>The language alone, "ur" for "ur-PK": what hreflang and og:locale want.</summary>
+    public string LanguageTag => LanguageCode.Split('-')[0].ToLowerInvariant();
+
     [GeneratedRegex(@"\s*\([^)]*\)\s*$")]
     private static partial Regex TrailingBrackets();
 }
@@ -95,6 +98,23 @@ public sealed record AyahText(
 
     public string Reference => $"{Surah.NameTransliterated} {Key}";
 }
+
+/// <summary>An ayah's address, and the pages it lives on.</summary>
+public sealed record AyahRef(Surah Surah, int Number)
+{
+    public string Key => $"{Surah.Number}:{Number}";
+
+    public string Reference => $"{Surah.NameTransliterated} {Key}";
+
+    /// <summary>The ayah's own page.</summary>
+    public string PagePath => $"/quran/{Surah.Number}/{Number}";
+
+    /// <summary>The ayah in its place in the surah.</summary>
+    public string ReaderPath => $"/quran/{Surah.Number}#a{Number}";
+}
+
+/// <summary>One translation of one ayah.</summary>
+public sealed record AyahTranslation(Edition Edition, string Text);
 
 /// <summary>Where the word-by-word glosses came from, and what they are not.</summary>
 public sealed record WordIndexInfo(string Notice, string LanguageName, EditionSource Source);

@@ -2,6 +2,8 @@
 @model IndexModel
 @{
     ViewData["BodyClass"] = "page-home";
+    ViewData["JsonLd"] = new[] { StructuredData.App(SiteSettings.Value, HttpContext.Request) };
+    AyahRef today = new(Model.Today.Surah, Model.Today.Number);
 }
 
 <section class="band hero" aria-labelledby="hero-title">
@@ -51,11 +53,11 @@
                 </blockquote>
             }
             <figcaption>
-                <span>@Model.Today.Surah.NameTransliterated @Model.Today.Key</span>
+                <a href="@today.PagePath">@today.Reference</a>
                 <span aria-hidden="true">·</span>
                 <span>@Model.TodayEdition.ShortTitle</span>
             </figcaption>
-            <a class="text-link" href="/quran/@Model.Today.Surah.Number/@Model.Today.Number">Read it in its surah @Icon.ArrowRight</a>
+            <a class="text-link" href="@today.ReaderPath">Read it in its surah @Icon.ArrowRight</a>
         </figure>
     </div>
 </section>

@@ -51,6 +51,17 @@
             @Icon.ArrowRight
         </a>
 
+        <nav class="often-read" aria-labelledby="often-read-title">
+            <p class="often-read-title" id="often-read-title">Often read</p>
+            <ul class="often-read-list">
+                @foreach (Surah often in Model.OftenReadSurahs)
+                {
+                    <li><a class="chip" href="/quran/@often.Number">@often.NameTransliterated</a></li>
+                }
+                <li><a class="chip" href="@Model.AyatAlKursi.PagePath">@OftenRead.AyatAlKursiName</a></li>
+            </ul>
+        </nav>
+
         <ol class="surah-grid" data-surah-list>
             @foreach (Surah surah in Model.Surahs)
             {

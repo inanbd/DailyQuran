@@ -58,10 +58,37 @@
     const last = readJson(dq?.store.get(LAST_READ));
     const card = index.querySelector('[data-continue]');
     if (card && last && Number.isInteger(last.s) && Number.isInteger(last.a) && typeof last.n === 'string') {
-      card.href = `/quran/${last.s}/${last.a}`;
+      // Back into the surah, at the ayah: reading goes on from there.
+      card.href = `/quran/${last.s}#a${last.a}`;
       card.querySelector('[data-continue-label]').textContent = `${last.n} ${last.s}:${last.a}`;
       card.hidden = false;
     }
+  }
+
+  // ===== An ayah's own page =====
+
+  const sheet = document.querySelector('[data-ayah-sheet]');
+  if (sheet) {
+    const reference = `${sheet.dataset.surahName} ${sheet.dataset.surah}:${sheet.dataset.ayah}`;
+    sheet.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-copy], [data-share]');
+      if (!button) return;
+      if (button.hasAttribute('data-copy')) {
+        // The Arabic and the first translation — the reader's own — rather
+        // than all of them, which would be more than anyone wants to paste.
+        const arabic = sheet.querySelector('.ayah-sheet-arabic')?.innerText;
+        const translation = sheet.querySelector('.translation-card .translation')?.innerText;
+        const text = [arabic, translation, `— ${reference}`].filter(Boolean).join('\n\n');
+        if (await dq?.copy(text)) dq.toast(`${reference} copied`);
+        return;
+      }
+      const url = window.location.origin + window.location.pathname;
+      if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+        try { await navigator.share({ title: reference, url }); } catch { /* dismissed */ }
+        return;
+      }
+      if (await dq?.copy(url)) dq.toast('Link copied');
+    });
   }
 
   // ===== Reader =====
@@ -89,16 +116,21 @@
     return true;
   };
 
-  // --- Opening on an ayah: from the address, or back where the reader was
-  //     before changing translation. ---
+  // --- Opening on an ayah: from the address (#a255), or back where the
+  //     reader was before changing translation. ---
+
+  const hashedAyah = () => (window.location.hash.match(/^#a(\d+)$/) || [])[1];
 
   const restore = readJson(sessionStorage.getItem(RESTORE));
   sessionStorage.removeItem(RESTORE);
   if (restore && restore.s === surah && restore.a > 1) {
     scrollToAyah(restore.a, { behavior: 'instant' });
-  } else if (reader.dataset.focus) {
-    requestAnimationFrame(() => scrollToAyah(reader.dataset.focus, { highlight: true, behavior: 'instant' }));
+  } else if (hashedAyah()) {
+    requestAnimationFrame(() => scrollToAyah(hashedAyah(), { highlight: true, behavior: 'instant' }));
   }
+  window.addEventListener('hashchange', () => {
+    if (hashedAyah()) scrollToAyah(hashedAyah(), { highlight: true });
+  });
 
   // --- The ayah being read: the one crossing the upper part of the screen ---
 
@@ -234,25 +266,9 @@
     }
   });
 
-  // --- Copying an ayah, or a link to it ---
+  // --- Copying an ayah, or a link to its own page ---
 
-  async function copyText(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      const area = document.createElement('textarea');
-      area.value = text;
-      area.setAttribute('readonly', '');
-      area.style.position = 'fixed';
-      area.style.opacity = '0';
-      document.body.appendChild(area);
-      area.select();
-      const copied = document.execCommand('copy');
-      area.remove();
-      return copied;
-    }
-  }
+  const copyText = (text) => dq?.copy(text) ?? Promise.resolve(false);
 
   reader.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-copy], [data-share]');

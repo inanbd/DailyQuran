@@ -9,6 +9,10 @@ public sealed class IndexModel(QuranLibrary library) : PageModel
 
     public IReadOnlyList<Edition> Editions => library.Editions;
 
+    public IEnumerable<Surah> OftenReadSurahs => OftenRead.Surahs.Select(n => library.FindSurah(n)!);
+
+    public AyahRef AyatAlKursi => OftenRead.AyatAlKursi(library);
+
     public ReaderPreferences Preferences { get; private set; } = null!;
 
     public void OnGet() => Preferences = ReaderPreferences.Resolve(HttpContext, library);

@@ -1,19 +1,42 @@
-@page "/quran/{surah:int}/{ayah:int?}"
+@page "/quran/{surah:int}"
 @model DailyQuran.Web.Pages.Reader.SurahModel
 @{
     Surah surah = Model.Surah;
     Edition edition = Model.Preferences.Edition;
-    string path = Model.Focus is { } focus ? $"/quran/{surah.Number}/{focus.Number}" : $"/quran/{surah.Number}";
+    string revealed = surah.RevelationPlace switch
+    {
+        RevelationPlace.Meccan => ", revealed in Mecca",
+        RevelationPlace.Medinan => ", revealed in Medina",
+        _ => "",
+    };
 
-    ViewData["Title"] = Model.Focus is { } f
-        ? $"{surah.NameTransliterated} {f.Key}"
-        : $"Surah {surah.NameTransliterated} ({surah.NameEnglish})";
-    ViewData["Description"] = Model.Focus?.Translation is { } quoted
-        ? (quoted.Length > 155 ? quoted[..152].TrimEnd() + "…" : quoted)
-        : $"Read Surah {surah.NameTransliterated} ({surah.NameEnglish}), {surah.AyahCountLabel}, in the Uthmani Arabic{(edition.HasTranslation ? $" with the {edition.ShortTitle} {edition.LanguageName} translation" : "")} — or word by word. Free, with no account.";
-    ViewData["Canonical"] = edition.Id == Model.DefaultEdition.Id ? path : $"{path}?t={edition.Id}";
+    // Each translation is its own page for search: its own title, and a
+    // language tag pointing at the others.
+    ViewData["Title"] = edition.HasTranslation
+        ? edition.Id == Model.DefaultEdition.Id
+            ? $"Surah {surah.NameTransliterated} ({surah.NameEnglish}) — Arabic & English"
+            : $"Surah {surah.NameTransliterated} ({surah.NameEnglish}) — {edition.LanguageName} translation, {edition.ShortTitle}"
+        : $"Surah {surah.NameTransliterated} ({surah.NameEnglish}) — Arabic, Uthmani script";
+    ViewData["Description"] =
+        $"Read Surah {surah.NameTransliterated} ({surah.NameArabic}, {surah.NameEnglish}) — {surah.AyahCountLabel}{revealed} — in the Uthmani Arabic"
+        + (edition.HasTranslation ? $" with the {edition.LanguageName} translation by {edition.Translator}" : "")
+        + ", or word by word. Free, with no account.";
+    ViewData["Canonical"] = Model.PathIn(edition);
+    ViewData["OgType"] = "article";
     ViewData["Nav"] = "quran";
     ViewData["BodyClass"] = "page-reader";
+    ViewData["JsonLd"] = new object[]
+    {
+        StructuredData.Breadcrumbs(SiteSettings.Value, HttpContext.Request, StructuredData.SurahTrail(surah)),
+    };
+}
+
+@section Head {
+    @foreach (Edition alternate in Model.Editions)
+    {
+        <link rel="alternate" hreflang="@alternate.LanguageTag" href="@SiteSettings.Value.AbsoluteUrl(HttpContext.Request, Model.PathIn(alternate))">
+    }
+    <link rel="alternate" hreflang="x-default" href="@SiteSettings.Value.AbsoluteUrl(HttpContext.Request, Model.PathIn(Model.DefaultEdition))">
 }
 
 <section class="band surah-hero" aria-labelledby="surah-title">
@@ -148,7 +171,6 @@
 <section class="reader" data-reader
          data-surah="@surah.Number"
          data-surah-name="@surah.NameTransliterated"
-         data-focus="@Model.Focus?.Number"
          data-has-translation="@(edition.HasTranslation ? "true" : "false")"
          aria-label="@surah.NameTransliterated">
     <div class="container reading">
@@ -162,7 +184,7 @@
             {
                 <li class="ayah" id="a@(ayah.Number)" data-ayah="@ayah.Number">
                     <div class="ayah-head">
-                        <a class="ayah-num" href="/quran/@surah.Number/@ayah.Number" aria-label="Ayah @ayah.Key">@ayah.Number</a>
+                        <a class="ayah-num" href="/quran/@surah.Number/@ayah.Number" aria-label="Ayah @ayah.Key, on a page of its own with every translation">@ayah.Number</a>
                         <div class="ayah-tools js-only">
                             <button type="button" class="icon-btn" data-copy aria-label="Copy ayah @ayah.Key">@Icon.Copy</button>
                             <button type="button" class="icon-btn" data-share aria-label="Copy a link to ayah @ayah.Key">@Icon.Link</button>
@@ -193,6 +215,12 @@
         </ol>
 
         <div class="ornament" aria-hidden="true"><span></span></div>
+
+        <p class="surah-about">
+            <strong>Surah @surah.NameTransliterated</strong> (@surah.NameEnglish) is surah @surah.Number of the
+            @Model.Surahs.Count in the Qur’an@(revealed), with @surah.AyahCountLabel —
+            ayat @Model.Positions.First.ToString("N0") to @Model.Positions.Last.ToString("N0") of 6,236 in reading order.
+        </p>
 
         <nav class="surah-pager" aria-label="More surahs">
             @if (Model.Previous is { } before)

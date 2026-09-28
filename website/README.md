@@ -14,11 +14,12 @@ touching the disk.
 | `/` | Home: the app in brief, the ayah for today, screenshots, download badges |
 | `/features` | Every feature, with screenshots, and the latest release notes from `CHANGELOG.md` |
 | `/quran` | The surah index: search by name or number, or go straight to `2:255` |
-| `/quran/{surah}` · `/quran/{surah}/{ayah}` | The reader: any edition, word by word, text size, typeface, light and dark |
+| `/quran/{surah}` | The reader: any edition, word by word, text size, typeface, light and dark. `#a255` opens it at an ayah |
+| `/quran/{surah}/{ayah}` | One ayah on a page of its own: the Arabic, word by word, and every translation |
 | `/contact` | The contact form, which sends you an email |
 | `/privacy` | The site's own privacy notes, then `PRIVACY.md` |
 | `/sources` | Every edition's translator, source and licence |
-| `/sitemap.xml` · `/robots.txt` · `/healthz` | For search engines and hosts |
+| `/sitemap.xml` · `/robots.txt` · `/site.webmanifest` · `/healthz` | For search engines, browsers and hosts |
 
 ## Running it
 
@@ -87,6 +88,43 @@ as environment variables and restart it instead.
   and link previews. Empty uses whatever address each request arrived on.
 - **`SourceCodeUrl`** — the GitHub repository; its issue tracker is offered on
   the contact page and in the footer. Empty hides both.
+
+### Search engines
+
+```json
+"Site": {
+  "BaseUrl": "https://dailyquran.example",
+  "Verification": {
+    "Google": "",
+    "Bing": ""
+  }
+}
+```
+
+- **`BaseUrl`** matters most here: canonical links, the sitemap and link
+  previews all use it. Set it to the one address you want found — with or
+  without `www`, on `https` — and have your host redirect the others to it.
+- **`Verification`** — the code from the meta tag
+  [Google Search Console](https://search.google.com/search-console) or
+  [Bing Webmaster Tools](https://www.bing.com/webmasters) asks you to add
+  (just the `content="…"` value). Then submit `/sitemap.xml` in each.
+
+What the site does for search, with nothing to set:
+
+- **A page for every ayah** — `/quran/2/255` holds the Arabic, word by word and
+  all six translations: 6,236 pages matching how people search for an ayah.
+- **Each translation of a surah is its own page** — `/quran/36?t=maududi` —
+  with its own title, and `hreflang` links tying the seven together so each
+  language's searchers are shown theirs.
+- **A sitemap index** of three: the pages, every surah in every edition (798),
+  and every ayah (6,236).
+- **Structured data** — the site and its publisher on every page, the app on
+  the home and features pages, and breadcrumbs on every surah and ayah.
+- **`noindex`** on what nobody should land on from a search — error pages, the
+  contact form's thank-you — and a canonical address on everything else, so a
+  word-by-word view or a translation chosen by cookie never counts twice.
+- **Fast first paint** — the hero image is fetched first, screenshots are
+  600px JPEGs, fonts are subset and self-hosted.
 
 ### The contact form
 
@@ -181,10 +219,13 @@ comes verbatim from the data files.
 
 Two things are copies, and need refreshing by hand:
 
-- **Screenshots** — `wwwroot/img/screens/` holds the Play Store screenshots
-  from `fastlane/metadata/android/en-US/images/phoneScreenshots/`. Copy them
-  across again when they change; `PhoneShot.cs` describes each for screen
-  readers.
+- **Screenshots and icons** — `wwwroot/img/screens/` holds the Play Store
+  screenshots from `fastlane/metadata/android/en-US/images/phoneScreenshots/`
+  as 600px JPEGs, and `wwwroot/img/icon-*.png` the store icon at the sizes
+  browsers ask for. When the store images change, run
+  `dotnet run website/tools/prepare-images.cs` from the repository root (on
+  Windows) to make them again; `PhoneShot.cs` describes each screenshot for
+  screen readers.
 - **Fonts** — self-hosted from Google Fonts, all under the SIL Open Font
   License. `tools/fetch-fonts.ps1 -OutDir src/DailyQuran.Web/wwwroot/fonts`
   downloads them again and rewrites `fonts.css`.

@@ -19,8 +19,8 @@ public sealed class SurahModel(QuranLibrary library) : PageModel
     /// <summary>The basmala set above the surah, taken from Al-Fatihah's first ayah; null for Al-Fatihah and At-Tawbah.</summary>
     public string? Basmala { get; private set; }
 
-    /// <summary>The ayah the address points at, which the page opens on.</summary>
-    public AyahText? Focus { get; private set; }
+    /// <summary>Where the surah falls in reading order: its first and last reading positions.</summary>
+    public (int First, int Last) Positions { get; private set; }
 
     public IReadOnlyList<Surah> Surahs => library.Surahs;
 
@@ -32,9 +32,13 @@ public sealed class SurahModel(QuranLibrary library) : PageModel
 
     public Edition DefaultEdition => library.DefaultEdition;
 
-    public IActionResult OnGet(int surah, int? ayah)
+    /// <summary>This surah's address in <paramref name="edition"/>: the plain one for the default, <c>?t=</c> for the rest.</summary>
+    public string PathIn(Edition edition) =>
+        edition.Id == library.DefaultEdition.Id ? $"/quran/{Surah.Number}" : $"/quran/{Surah.Number}?t={edition.Id}";
+
+    public IActionResult OnGet(int surah)
     {
-        if (library.FindSurah(surah) is not { } found || (ayah is { } asked && !library.Contains(surah, asked)))
+        if (library.FindSurah(surah) is not { } found)
         {
             return NotFound();
         }
@@ -45,7 +49,7 @@ public sealed class SurahModel(QuranLibrary library) : PageModel
         Preferences = ReaderPreferences.Resolve(HttpContext, library);
         Ayat = library.GetSurah(surah, Preferences.Edition, Preferences.WordByWord);
         Basmala = found.HasBasmalaHeading ? library.GetAyah(1, 1, library.DefaultEdition).Arabic : null;
-        Focus = ayah is { } number ? Ayat[number - 1] : null;
+        Positions = (library.ReadingPosition(surah, 1), library.ReadingPosition(surah, found.AyahCount));
         return Page();
     }
 }

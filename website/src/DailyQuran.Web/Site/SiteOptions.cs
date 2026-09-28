@@ -20,6 +20,8 @@ public sealed class SiteOptions
     /// <summary>Where the app's source and issue tracker live. Empty hides the links.</summary>
     public string SourceCodeUrl { get; set; } = "";
 
+    public SiteVerification Verification { get; set; } = new();
+
     public string AbsoluteUrl(HttpRequest request, string path)
     {
         string origin = BaseUrl.Length > 0
@@ -49,6 +51,18 @@ public sealed class StoreLinks
 
     /// <summary>A direct APK download, offered in small print beneath the badges.</summary>
     public string Apk { get; set; } = "";
+}
+
+/// <summary>
+/// The codes Google Search Console and Bing Webmaster Tools give to prove the
+/// site is yours: the <c>content</c> of the meta tag each one asks you to add.
+/// Empty leaves the tag out.
+/// </summary>
+public sealed class SiteVerification
+{
+    public string Google { get; set; } = "";
+
+    public string Bing { get; set; } = "";
 }
 
 /// <summary>The <c>Quran</c> section of appsettings.json.</summary>

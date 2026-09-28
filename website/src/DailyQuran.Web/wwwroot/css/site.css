@@ -1774,3 +1774,85 @@ a.store-badge:hover { transform: translateY(-2px); box-shadow: 0 14px 26px -16px
   .surah-hero-arabic, .surah-hero h1, .surah-hero-meta, .crumbs { color: #000; }
   .ayah { break-inside: avoid; }
 }
+
+/* ---------- Ayah page ---------- */
+
+.ayah-hero { padding-bottom: clamp(2.5rem, 2rem + 2vw, 3.5rem); }
+.surah-hero-arabic.small { margin-top: 1rem; font-size: clamp(1.9rem, 1.5rem + 1.6vw, 2.6rem); }
+.ayah-title-key { color: var(--gold-bright); font-weight: 500; }
+
+.ayah-page { padding-top: clamp(2.5rem, 2rem + 2vw, 3.5rem); }
+
+.ayah-sheet {
+  position: relative;
+  padding: clamp(1.75rem, 1.25rem + 2.5vw, 3rem);
+  border: 1px solid var(--line-strong);
+  border-radius: 28px;
+  background:
+    url("/img/star.svg") top 16px left 16px / 10px no-repeat,
+    url("/img/star.svg") top 16px right 16px / 10px no-repeat,
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+.ayah-sheet-arabic {
+  margin: 0 0 1.75rem;
+  font-family: var(--font-quran);
+  font-size: calc(clamp(1.9rem, 1.6rem + 1.2vw, 2.5rem) * var(--reader-scale));
+  line-height: 2.3;
+  text-align: right;
+  color: var(--ink);
+}
+.ayah-sheet-tools { display: flex; flex-wrap: wrap; gap: 0.6rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+
+.ayah-block { margin-top: clamp(3rem, 2.5rem + 2vw, 4rem); }
+.ayah-block h2 { font-size: clamp(1.8rem, 1.5rem + 1.2vw, 2.4rem); }
+
+.translation-list { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.translation-card {
+  padding: 1.35rem 1.5rem;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--gold);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.translation-card-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-ink);
+}
+.translation-card-by { font-weight: 500; letter-spacing: 0.02em; text-transform: none; color: var(--muted); font-size: 0.88rem; }
+
+.wbw-sheet { margin-top: 1.5rem; }
+.ayah-page .surah-pager { margin-top: clamp(3rem, 2.5rem + 2vw, 4rem); }
+
+/* ---------- Often read, and a surah's facts ---------- */
+
+.often-read { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; margin-bottom: 2rem; }
+.often-read-title {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-ink);
+}
+.often-read-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.surah-about {
+  max-width: 62ch;
+  margin: 0 auto 2.5rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.97rem;
+}
+.surah-about strong { color: var(--ink); font-weight: 600; }
+
+.daily-ayah figcaption a { color: inherit; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+.daily-ayah figcaption a:hover { color: var(--accent); }

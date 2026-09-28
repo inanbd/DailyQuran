@@ -105,5 +105,25 @@
     toastTimer = window.setTimeout(() => toastElement.classList.remove('is-shown'), 2200);
   }
 
-  window.dq = { store, setTheme, effectiveTheme, toast };
+  // ----- Copying to the clipboard, with a fallback for older browsers -----
+
+  async function copy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      const copied = document.execCommand('copy');
+      area.remove();
+      return copied;
+    }
+  }
+
+  window.dq = { store, setTheme, effectiveTheme, toast, copy };
 })();

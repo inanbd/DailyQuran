@@ -50,9 +50,12 @@ public sealed class SiteContent
         return string.Join('\n', lines.SkipWhile(l => !l.StartsWith("# ", StringComparison.Ordinal)).Skip(1));
     }
 
+    /// <summary>The newest released version: an "Unreleased" section at the top is work not yet in anyone's hands.</summary>
     private static ReleaseNotes? LatestSection(string[] lines)
     {
-        int start = Array.FindIndex(lines, l => l.StartsWith("## ", StringComparison.Ordinal));
+        int start = Array.FindIndex(lines, l =>
+            l.StartsWith("## ", StringComparison.Ordinal)
+            && !l[3..].Trim().Equals("Unreleased", StringComparison.OrdinalIgnoreCase));
         if (start < 0)
         {
             return null;

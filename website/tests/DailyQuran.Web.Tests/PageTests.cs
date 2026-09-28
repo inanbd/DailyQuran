@@ -126,12 +126,25 @@ public sealed class PageTests(SiteFactory site) : IClassFixture<SiteFactory>
     }
 
     [Fact]
-    public async Task The_sitemap_lists_every_surah()
+    public async Task The_sitemap_lists_every_page_surah_and_ayah()
     {
-        string xml = await _client.GetStringAsync("/sitemap.xml");
+        string index = await _client.GetStringAsync("/sitemap.xml");
+        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"utf-8\"?>", index);
+        Assert.Contains("<sitemapindex", index);
+        Assert.Equal(3, Regex.Matches(index, "<sitemap>").Count);
 
-        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"utf-8\"?>", xml);
-        Assert.Equal(114, Regex.Matches(xml, @"/quran/\d+</loc>").Count);
+        string pages = await _client.GetStringAsync("/sitemap-pages.xml");
+        string surahs = await _client.GetStringAsync("/sitemap-surahs.xml");
+        string ayat = await _client.GetStringAsync("/sitemap-ayat.xml");
+
+        Assert.Equal(6, Regex.Matches(pages, "<loc>").Count);
+        // Each surah once in every edition: 114 x 7.
+        Assert.Equal(798, Regex.Matches(surahs, "<loc>").Count);
+        Assert.Equal(114, Regex.Matches(surahs, @"/quran/\d+</loc>").Count);
+        Assert.Contains("/quran/36?t=maududi</loc>", surahs);
+        Assert.Equal(6236, Regex.Matches(ayat, "<loc>").Count);
+        Assert.Contains("/quran/2/255</loc>", ayat);
+        Assert.Contains("/quran/114/6</loc>", ayat);
     }
 
     [Fact]

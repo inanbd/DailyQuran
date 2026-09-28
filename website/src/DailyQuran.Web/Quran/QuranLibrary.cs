@@ -70,6 +70,58 @@ public sealed class QuranLibrary
     /// <summary>The ayah's position in reading order, from 1 (1:1) to 6,236 (114:6).</summary>
     public int ReadingPosition(int surah, int ayah) => Ordinal(surah, ayah) + 1;
 
+    /// <summary>The ayah at a reading position: 262 is 2:255.</summary>
+    public AyahRef AtPosition(int position)
+    {
+        if (position < 1 || position > TotalAyah)
+        {
+            throw new ArgumentOutOfRangeException(nameof(position));
+        }
+        int ordinal = position - 1;
+        int low = 1, high = Surahs.Count;
+        while (low < high)
+        {
+            int middle = (low + high + 1) / 2;
+            if (_surahStart[middle] <= ordinal)
+            {
+                low = middle;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+        return new AyahRef(Surahs[low - 1], ordinal - _surahStart[low] + 1);
+    }
+
+    /// <summary>The ayah before this one in reading order, across surahs; null before 1:1.</summary>
+    public AyahRef? Before(int surah, int ayah)
+    {
+        int position = ReadingPosition(surah, ayah);
+        return position > 1 ? AtPosition(position - 1) : null;
+    }
+
+    /// <summary>The ayah after this one in reading order, across surahs; null after 114:6.</summary>
+    public AyahRef? After(int surah, int ayah)
+    {
+        int position = ReadingPosition(surah, ayah);
+        return position < TotalAyah ? AtPosition(position + 1) : null;
+    }
+
+    /// <summary>
+    /// This ayah in every translation, <paramref name="first"/> leading and the
+    /// rest in library order. An edition with no text for the ayah is left out.
+    /// </summary>
+    public IReadOnlyList<AyahTranslation> TranslationsOf(int surah, int ayah, Edition? first = null)
+    {
+        int ordinal = Ordinal(surah, ayah);
+        return Translations
+            .OrderBy(e => first is not null && e.Id == first.Id ? 0 : 1)
+            .Select(e => _translations[e.Id][ordinal] is { } text ? new AyahTranslation(e, text) : null)
+            .OfType<AyahTranslation>()
+            .ToArray();
+    }
+
     public AyahText GetAyah(int surah, int ayah, Edition edition, bool withWords = false)
     {
         Surah found = FindSurah(surah) ?? throw new ArgumentOutOfRangeException(nameof(surah));

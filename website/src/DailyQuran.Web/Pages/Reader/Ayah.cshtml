@@ -1,0 +1,118 @@
+@page "/quran/{surah:int}/{ayah:int}"
+@model DailyQuran.Web.Pages.Reader.AyahModel
+@{
+    AyahRef here = Model.Ref;
+    Surah surah = here.Surah;
+    string languages = string.Join(", ", Model.Translations.Select(t => t.Edition.LanguageName).Distinct().OrderBy(l => l == "English" ? 0 : 1));
+    string? english = Model.Translations.FirstOrDefault(t => t.Edition.Id == Model.DefaultEdition.Id)?.Text;
+    string lead = english is null ? "" : (english.Length > 120 ? english[..117].TrimEnd() + "… — " : english + " — ");
+
+    ViewData["Title"] = $"{here.Reference} — Arabic, word by word & translations";
+    ViewData["Description"] = $"{lead}Surah {surah.NameTransliterated} ({surah.NameEnglish}) {here.Key} in the Uthmani Arabic, word by word, and in {languages}.";
+    ViewData["Canonical"] = here.PagePath;
+    ViewData["OgType"] = "article";
+    ViewData["Nav"] = "quran";
+    ViewData["BodyClass"] = "page-ayah";
+    ViewData["JsonLd"] = new object[]
+    {
+        StructuredData.Breadcrumbs(SiteSettings.Value, HttpContext.Request,
+            [.. StructuredData.SurahTrail(surah), ($"Ayah {here.Number}", here.PagePath)]),
+    };
+}
+
+<section class="band page-hero ayah-hero" aria-labelledby="ayah-title">
+    <div class="container narrow center">
+        <nav class="crumbs" aria-label="Breadcrumb">
+            <a href="/quran">The Qur’an</a>
+            <span aria-hidden="true">/</span>
+            <a href="/quran/@surah.Number">@surah.NameTransliterated</a>
+            <span aria-hidden="true">/</span>
+            <span>Ayah @here.Number</span>
+        </nav>
+        <p class="surah-hero-arabic small" lang="ar" dir="rtl">@surah.NameArabic</p>
+        <h1 id="ayah-title">@surah.NameTransliterated <span class="ayah-title-key">@here.Key</span></h1>
+        <p class="surah-hero-meta">
+            <span>@surah.NameEnglish</span>
+            <span aria-hidden="true">·</span>
+            <span>Ayah @here.Number of @surah.AyahCount</span>
+        </p>
+    </div>
+</section>
+
+<section class="section ayah-page" data-ayah-sheet data-surah="@surah.Number" data-ayah="@here.Number" data-surah-name="@surah.NameTransliterated">
+    <div class="container narrow">
+        <article class="ayah-sheet">
+            <p class="ayah-sheet-arabic" lang="ar" dir="rtl">@Model.Ayah.Arabic</p>
+            <div class="ayah-sheet-tools">
+                <a class="btn btn-primary btn-small" href="@here.ReaderPath">@Icon.Book Read in the surah</a>
+                <button type="button" class="btn btn-outline btn-small js-only" data-copy>@Icon.Copy Copy</button>
+                <button type="button" class="btn btn-outline btn-small js-only" data-share>@Icon.Link Copy link</button>
+            </div>
+        </article>
+
+        <section class="ayah-block" aria-labelledby="translations-title">
+            <p class="eyebrow">Translations</p>
+            <h2 id="translations-title">What it means</h2>
+            <ul class="translation-list">
+                @foreach (AyahTranslation translation in Model.Translations)
+                {
+                    <li class="translation-card">
+                        <p class="translation-card-label">
+                            <span>@translation.Edition.LanguageDisplay</span>
+                            <span class="translation-card-by">@translation.Edition.Translator</span>
+                        </p>
+                        <p class="translation" lang="@translation.Edition.LanguageCode" dir="@translation.Edition.Direction">@translation.Text</p>
+                    </li>
+                }
+            </ul>
+        </section>
+
+        @if (Model.Ayah.Words is { Count: > 0 } words)
+        {
+            <section class="ayah-block" aria-labelledby="words-title">
+                <p class="eyebrow">Word by word</p>
+                <h2 id="words-title">Each word, and what it means</h2>
+                <ol class="wbw wbw-sheet" lang="ar" dir="rtl">
+                    @foreach (Word word in words)
+                    {
+                        <li>
+                            <span class="w-ar">@word.Arabic</span>
+                            <span class="w-gl" lang="en" dir="ltr">@word.Gloss</span>
+                        </li>
+                    }
+                </ol>
+                <p class="note">A reading aid, not a translation: each gloss says what one word means on its own. The translations above say what the ayah means.</p>
+            </section>
+        }
+
+        <nav class="surah-pager" aria-label="Neighbouring ayat">
+            @if (Model.Previous is { } previous)
+            {
+                <a class="pager-card is-previous" href="@previous.PagePath">
+                    <span class="pager-dir">@Icon.ArrowLeft Previous ayah</span>
+                    <span class="pager-name">@previous.Reference</span>
+                </a>
+            }
+            @if (Model.Next is { } next)
+            {
+                <a class="pager-card is-next" href="@next.PagePath">
+                    <span class="pager-dir">Next ayah @Icon.ArrowRight</span>
+                    <span class="pager-name">@next.Reference</span>
+                </a>
+            }
+        </nav>
+
+        <p class="attribution">
+            Text copied verbatim from @Model.DefaultEdition.Source.Name, @(Model.DefaultEdition.Source.Licence ?? "used with permission").
+            @if (Model.WordIndex is { } wordIndex && Model.Ayah.Words is not null)
+            {
+                <text>Word glosses from @wordIndex.Source.Name. </text>
+            }
+            <a href="/sources">Sources and licences</a>.
+        </p>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/quran.js" asp-append-version="true" defer></script>
+}

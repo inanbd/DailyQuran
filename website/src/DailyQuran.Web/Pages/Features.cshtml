@@ -2,6 +2,7 @@
 @model FeaturesModel
 @{
     ViewData["Title"] = "Features";
+    ViewData["JsonLd"] = new[] { StructuredData.App(SiteSettings.Value, HttpContext.Request) };
     ViewData["Description"] = "Everything Daily Quran does: one ayah at a time, the Qur’an Planner, seven editions in six languages, word by word, reading time and streaks, and reminders that respect your privacy.";
     ViewData["Nav"] = "features";
 }
@@ -40,8 +41,8 @@
                     <p>Tap <em>Mark as read</em>, or simply stay with an ayah until its end has been on screen for a few seconds. Swiping past on the way to the next one does not count.</p>
                 </li>
                 <li>
-                    <h3>Turn the page like a mushaf</h3>
-                    <p>Swipe between ayat, or jump anywhere from the surah index. Browsing never marks anything read.</p>
+                    <h3>Swipe — or scroll</h3>
+                    <p>Swipe and the page follows your finger, the next ayah already there beneath it, settling into place like a gallery. Or read the Qur’an as one column, surah after surah. Browsing never marks anything read.</p>
                 </li>
                 <li>
                     <h3>Two translations together</h3>

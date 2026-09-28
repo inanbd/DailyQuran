@@ -1,0 +1,158 @@
+@page
+@model IndexModel
+@{
+    ViewData["BodyClass"] = "page-home";
+}
+
+<section class="band hero" aria-labelledby="hero-title">
+    <div class="container hero-inner">
+        <div class="hero-copy">
+            <p class="hero-basmala" lang="ar" dir="rtl">@Model.Basmala.Arabic</p>
+            <h1 id="hero-title" class="hero-title">Daily Quran</h1>
+            <span class="gold-rule" aria-hidden="true"></span>
+            <p class="hero-lead">An ayah a day, or the whole Qur’an by a date you choose.</p>
+            <p class="hero-text">
+                A quiet reading app for your phone. Read one ayah at a time with its translation,
+                pick up exactly where you left off, and let gentle reminders bring you back —
+                with no account, no ads and nothing tracked.
+            </p>
+            <partial name="_StoreBadges" />
+            <a class="hero-link" href="/quran">Or begin reading here, in seven editions @Icon.ArrowRight</a>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+            <svg class="arch" viewBox="0 0 400 560" preserveAspectRatio="xMidYMax meet" focusable="false">
+                <defs>
+                    <radialGradient id="arch-glow" cx="50%" cy="30%" r="70%">
+                        <stop offset="0" stop-color="#F7F2E6" stop-opacity="0.16" />
+                        <stop offset="1" stop-color="#F7F2E6" stop-opacity="0" />
+                    </radialGradient>
+                </defs>
+                <path d="M20 560V232C20 132 108 74 200 14C292 74 380 132 380 232V560" fill="url(#arch-glow)" stroke="#C9A469" stroke-opacity="0.6" stroke-width="1.2" />
+                <path d="M40 560V238C40 150 120 96 200 42C280 96 360 150 360 238V560" fill="none" stroke="#C9A469" stroke-opacity="0.3" stroke-width="1" />
+                <path d="M200 0l5 5-5 5-5-5z" fill="#C9A469" />
+            </svg>
+            <partial name="_Phone" model="@PhoneShot.Planner.With("phone-back")" />
+            <partial name="_Phone" model="@PhoneShot.Read.With("phone-front", eager: true)" />
+        </div>
+    </div>
+</section>
+
+<section class="section daily" aria-labelledby="daily-title">
+    <div class="container narrow">
+        <p class="eyebrow centered" id="daily-title">Ayah for today</p>
+        <figure class="daily-ayah reveal">
+            <p class="daily-arabic" lang="ar" dir="rtl">@Model.Today.Arabic</p>
+            <div class="ornament" aria-hidden="true"><span></span></div>
+            @if (Model.Today.Translation is { } translation)
+            {
+                <blockquote class="daily-translation" lang="@Model.TodayEdition.LanguageCode" dir="@Model.TodayEdition.Direction">
+                    <p>@translation</p>
+                </blockquote>
+            }
+            <figcaption>
+                <span>@Model.Today.Surah.NameTransliterated @Model.Today.Key</span>
+                <span aria-hidden="true">·</span>
+                <span>@Model.TodayEdition.ShortTitle</span>
+            </figcaption>
+            <a class="text-link" href="/quran/@Model.Today.Surah.Number/@Model.Today.Number">Read it in its surah @Icon.ArrowRight</a>
+        </figure>
+    </div>
+</section>
+
+<section class="section inside" aria-labelledby="inside-title">
+    <div class="container">
+        <div class="section-head center reveal">
+            <p class="eyebrow centered">Inside the app</p>
+            <h2 id="inside-title">Everything a steady practice needs — and nothing it doesn’t</h2>
+            <p class="lead">Daily Quran is built around one idea: that a little, read every day, adds up. Here is what it gives you.</p>
+        </div>
+
+        <ul class="feature-cards">
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Book</span>
+                <h3>One ayah at a time</h3>
+                <p>The Uthmani Arabic and its translation, set for calm reading in light or dark. Your place is kept, and nothing is marked read unless you read it.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Calendar</span>
+                <h3>The Qur’an Planner</h3>
+                <p>Finish in a month, a year, or by any date you pick. The app works out each day’s goal, and adjusts it as you go.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Globe</span>
+                <h3>Seven editions</h3>
+                <p>English, Urdu, Bengali, French, Spanish and Russian translations — or the Arabic alone. Change translation and keep your place.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Words</span>
+                <h3>Word by word</h3>
+                <p>Each Arabic word with its meaning, in the Arabic’s own right-to-left order, and the ayah’s translation beneath.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Bell</span>
+                <h3>Reminders that respect you</h3>
+                <p>Up to five a day, at the times you choose. Later ones fall quiet once you have read, and the lock screen shows nothing unless you ask.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Star</span>
+                <h3>A streak that only praises</h3>
+                <p>Set a daily reading time and watch the days add up. A kind word when it is earned; a missed day simply starts again.</p>
+            </li>
+        </ul>
+
+        <p class="center more-link reveal"><a class="btn btn-outline" href="/features">Explore every feature @Icon.ArrowRight</a></p>
+    </div>
+</section>
+
+<section class="section gallery-section" aria-labelledby="gallery-title">
+    <div class="container">
+        <div class="section-head center reveal">
+            <p class="eyebrow centered">A closer look</p>
+            <h2 id="gallery-title">Calm by design</h2>
+            <p class="lead">Warm paper, one green, a touch of gold — and room for the words to breathe.</p>
+        </div>
+    </div>
+    <div class="gallery" tabindex="0" aria-label="Screens from the app">
+        @foreach ((PhoneShot shot, string caption) in new[]
+        {
+            (PhoneShot.Read, "Reading"),
+            (PhoneShot.Planner, "The Qur’an Planner"),
+            (PhoneShot.Progress, "Your progress"),
+            (PhoneShot.Reminders, "Reminders"),
+            (PhoneShot.Library, "Translations"),
+        })
+        {
+            <div class="gallery-item reveal">
+                <partial name="_Phone" model="shot" />
+                <p class="gallery-caption">@caption</p>
+            </div>
+        }
+    </div>
+</section>
+
+<partial name="_Principles" />
+
+<section class="section read-online" aria-labelledby="online-title">
+    <div class="container narrow center reveal">
+        <p class="eyebrow centered">Read online</p>
+        <h2 id="online-title">The whole Qur’an, here too</h2>
+        <p class="lead">
+            All 114 surahs in the Uthmani script, with any of the app’s translations or word by word.
+            Nothing to install, and no account.
+        </p>
+        <ul class="language-chips">
+            @foreach (Edition edition in Model.Editions)
+            {
+                <li>
+                    <a class="chip" href="/quran?t=@edition.Id" lang="@(edition.HasTranslation ? edition.LanguageCode : "en")">
+                        @(edition.HasTranslation ? (edition.LanguageNativeName ?? edition.LanguageName) : "Arabic only")
+                    </a>
+                </li>
+            }
+        </ul>
+        <a class="btn btn-primary" href="/quran">@Icon.Book Open the Qur’an</a>
+    </div>
+</section>
+
+<partial name="_Download" />

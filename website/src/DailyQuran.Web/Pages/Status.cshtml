@@ -1,0 +1,24 @@
+@page "/status/{code:int}"
+@model StatusModel
+@{
+    (string heading, string message) = Model.Code switch
+    {
+        404 => ("This page could not be found", "The address may have a small mistake in it, or the page may have moved."),
+        429 => ("A little too quickly", "Please wait a few minutes and try again."),
+        >= 500 => ("Something went wrong", "It was our mistake, not yours. Please try again in a moment."),
+        _ => ("That did not work", "Please go back and try again."),
+    };
+    ViewData["Title"] = heading;
+}
+
+<section class="band page-hero status" aria-labelledby="page-title">
+    <div class="container narrow center">
+        <p class="status-code" aria-hidden="true">@Model.Code</p>
+        <h1 id="page-title">@heading</h1>
+        <p class="lead">@message</p>
+        <div class="status-actions">
+            <a class="btn btn-gold" href="/">Go to the home page</a>
+            <a class="btn btn-on-band" href="/quran">Read the Qur’an</a>
+        </div>
+    </div>
+</section>

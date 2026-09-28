@@ -1,0 +1,45 @@
+@*
+    The Google Play and App Store badges, linked to the addresses under
+    Site:Stores in appsettings.json. A store left empty shows its badge as
+    "Coming soon" instead of a link that goes nowhere. While
+    Site:Stores:GooglePlayInternalTesting is on, a note above the badges asks
+    visitors to get in touch for access.
+*@
+@{
+    StoreLinks stores = SiteSettings.Value.Stores;
+
+    void Badge(string url, string image, string label, int width)
+    {
+        if (url.Length > 0)
+        {
+            <a class="store-badge" href="@url" rel="noopener">
+                <img src="@Url.Content(image)" alt="@label" width="@width" height="52">
+            </a>
+        }
+        else
+        {
+            <span class="store-badge is-soon">
+                <img src="@Url.Content(image)" alt="@label — coming soon" width="@width" height="52">
+                <span class="soon-tag" aria-hidden="true">Coming soon</span>
+            </span>
+        }
+    }
+}
+<div class="store-links">
+    @if (stores.GooglePlayInternalTesting)
+    {
+        <p class="store-note">
+            <span class="store-note-tag">Early access</span>
+            <span>
+                The Android app is in internal testing on Google Play.
+                <a href="/contact?topic=@ContactTopic.AppAccess.Key">Contact the developer</a> to get access.
+            </span>
+        </p>
+    }
+    <div class="store-badges">
+        @{
+            Badge(stores.GooglePlay, "~/img/badges/google-play.svg", "Get it on Google Play", 176);
+            Badge(stores.AppStore, "~/img/badges/app-store.svg", "Download on the App Store", 156);
+        }
+    </div>
+</div>

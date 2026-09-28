@@ -1,0 +1,7 @@
+bin/
+obj/
+*.user
+.vs/
+
+# Messages the contact form writes locally in Development.
+App_Data/

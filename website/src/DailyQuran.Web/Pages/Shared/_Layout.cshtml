@@ -1,0 +1,140 @@
+@{
+    SiteOptions site = SiteSettings.Value;
+    string title = ViewData["Title"] is string { Length: > 0 } pageTitle
+        ? $"{pageTitle} · Daily Quran"
+        : "Daily Quran — An ayah a day, or the whole Qur'an by a date you choose";
+    string description = ViewData["Description"] as string
+        ?? "A quiet Qur'an reading app for Android and iPhone: one ayah at a time, gentle reminders, and a plan to finish the whole Qur'an. Read all 114 surahs online in seven editions.";
+    string canonical = site.AbsoluteUrl(Context.Request, ViewData["Canonical"] as string ?? Context.Request.Path.Value ?? "/");
+    string nav = ViewData["Nav"] as string ?? "";
+    string? Current(string key) => nav == key ? "page" : null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>@title</title>
+    <meta name="description" content="@description">
+    <link rel="canonical" href="@canonical">
+    <meta name="theme-color" content="#1F4A3C" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0B1814" media="(prefers-color-scheme: dark)">
+    <meta name="color-scheme" content="light dark">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Daily Quran">
+    <meta property="og:title" content="@(ViewData["Title"] as string ?? "Daily Quran")">
+    <meta property="og:description" content="@description">
+    <meta property="og:url" content="@canonical">
+    <meta property="og:image" content="@site.AbsoluteUrl(Context.Request, "/img/og.png")">
+    <meta property="og:image:width" content="1024">
+    <meta property="og:image:height" content="500">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <link rel="icon" href="~/img/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="~/img/icon-512.png">
+    <link rel="preload" href="/fonts/CormorantGaramond-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/Inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
+    <script nonce="@Context.GetCspNonce()">
+        (function () {
+            var d = document.documentElement;
+            d.classList.add('js');
+            try {
+                var s = window.localStorage;
+                var t = s.getItem('dq-theme');
+                if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+                var r = JSON.parse(s.getItem('dq-display') || '{}');
+                var n = parseFloat(r.scale);
+                if (n >= 0.8 && n <= 1.6) d.style.setProperty('--reader-scale', n);
+                if (r.script === 'naskh' || r.script === 'amiri') d.setAttribute('data-script', r.script);
+                if (r.hideArabic) d.setAttribute('data-hide-arabic', '');
+                if (r.hideTranslation) d.setAttribute('data-hide-translation', '');
+            } catch (e) { }
+        })();
+    </script>
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body class="@ViewData["BodyClass"]">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-header>
+        <div class="container header-inner">
+            <a class="brand" href="/" aria-label="Daily Quran — home">
+                <img src="~/img/icon.svg" alt="" width="36" height="36">
+                <span>Daily Quran</span>
+            </a>
+            <nav class="site-nav" id="site-nav" aria-label="Main">
+                <a href="/features" aria-current="@Current("features")">Features</a>
+                <a href="/quran" aria-current="@Current("quran")">Read the Qur’an</a>
+                <a href="/contact" aria-current="@Current("contact")">Contact</a>
+                <a class="btn btn-gold nav-cta" href="/#download">@Icon.Download Get the app</a>
+            </nav>
+            <div class="header-actions">
+                <button type="button" class="icon-btn theme-toggle" data-theme-toggle aria-label="Switch between light and dark">
+                    <span class="icon-moon">@Icon.Moon</span>
+                    <span class="icon-sun">@Icon.Sun</span>
+                </button>
+                <a class="btn btn-gold btn-small header-cta" href="/#download">Get the app</a>
+                <button type="button" class="icon-btn nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Menu">
+                    <span class="icon-open">@Icon.Menu</span>
+                    <span class="icon-close">@Icon.Close</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main id="main">
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer band">
+        <div class="container footer-grid">
+            <div class="footer-brand">
+                <a class="brand" href="/">
+                    <img src="~/img/icon.svg" alt="" width="40" height="40">
+                    <span>Daily Quran</span>
+                </a>
+                <p>One ayah at a time, gentle reminders, steady progress.</p>
+            </div>
+            <nav aria-labelledby="footer-app">
+                <h2 id="footer-app" class="footer-head">The app</h2>
+                <ul>
+                    <li><a href="/features">Features</a></li>
+                    <li><a href="/#download">Download</a></li>
+                    <li><a href="/privacy">Privacy</a></li>
+                </ul>
+            </nav>
+            <nav aria-labelledby="footer-quran">
+                <h2 id="footer-quran" class="footer-head">The Qur’an</h2>
+                <ul>
+                    <li><a href="/quran">Read online</a></li>
+                    <li><a href="/quran/1">Al-Fatihah</a></li>
+                    <li><a href="/sources">Sources &amp; licences</a></li>
+                </ul>
+            </nav>
+            <nav aria-labelledby="footer-contact">
+                <h2 id="footer-contact" class="footer-head">Get in touch</h2>
+                <ul>
+                    <li><a href="/contact">Contact us</a></li>
+                    @if (site.SourceCodeUrl.Length > 0)
+                    {
+                        <li><a href="@site.SourceCodeUrl.TrimEnd('/')/issues">Report an issue</a></li>
+                        <li><a href="@site.SourceCodeUrl">Source code</a></li>
+                    }
+                </ul>
+            </nav>
+        </div>
+        <div class="container footer-bottom">
+            <p>© @DateTime.UtcNow.Year @site.Publisher · No account, no ads, no tracking.</p>
+            <p>Qur’an text and translations from <a href="/sources">quran-json</a>, shared under CC BY-SA 4.0.</p>
+        </div>
+    </footer>
+
+    <div class="toast" role="status" aria-live="polite" data-toast></div>
+
+    <script src="~/js/site.js" asp-append-version="true" defer></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

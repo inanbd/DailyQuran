@@ -1,0 +1,17 @@
+@page "/error"
+@model ErrorModel
+@{
+    ViewData["Title"] = "Something went wrong";
+}
+
+<section class="band page-hero status" aria-labelledby="page-title">
+    <div class="container narrow center">
+        <p class="status-code" aria-hidden="true">500</p>
+        <h1 id="page-title">Something went wrong</h1>
+        <p class="lead">It was our mistake, not yours. Please try again in a moment.</p>
+        <div class="status-actions">
+            <a class="btn btn-gold" href="/">Go to the home page</a>
+            <a class="btn btn-on-band" href="/quran">Read the Qur’an</a>
+        </div>
+    </div>
+</section>

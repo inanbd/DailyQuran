@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Daily Quran</title>
+  <defs>
+    <radialGradient id="g" cx="50%" cy="38%" r="72%">
+      <stop offset="0" stop-color="#32705D"/>
+      <stop offset="1" stop-color="#1F4A3C"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#g)"/>
+  <g transform="translate(32 32.5) scale(0.84)">
+    <path fill="#C9A469" fill-rule="evenodd" d="M0 -25L3.515 -21.485L8.485 -21.485L8.485 -16.515L12 -13L8.485 -9.485L8.485 -4.515L3.515 -4.515L0 -1L-3.515 -4.515L-8.485 -4.515L-8.485 -9.485L-12 -13L-8.485 -16.515L-8.485 -21.485L-3.515 -21.485ZM0 -16.4A3.4 3.4 0 1 0 0 -9.6A3.4 3.4 0 1 0 0 -16.4Z"/>
+    <path fill="#C9A469" d="M-1.2 8Q-6 3.5 -23.5 3L-23.5 20.5Q-6 20.5 -1.2 25ZM1.2 8Q6 3.5 23.5 3L23.5 20.5Q6 20.5 1.2 25Z"/>
+    <path fill="#FAF9F6" d="M-1.2 5Q-6 0.5 -22 1L-22 18Q-6 17.5 -1.2 22ZM1.2 5Q6 0.5 22 1L22 18Q6 17.5 1.2 22Z"/>
+  </g>
+</svg>

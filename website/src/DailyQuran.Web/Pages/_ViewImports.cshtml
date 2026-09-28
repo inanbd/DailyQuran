@@ -1,0 +1,9 @@
+@using DailyQuran.Web
+@using DailyQuran.Web.Contact
+@using DailyQuran.Web.Quran
+@using DailyQuran.Web.Site
+@using Microsoft.Extensions.Options
+@namespace DailyQuran.Web.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@* A snapshot per request, so an edit to appsettings.json shows on the next page without a restart. *@
+@inject IOptionsSnapshot<SiteOptions> SiteSettings

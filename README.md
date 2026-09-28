@@ -28,6 +28,7 @@ ever counts up and praises: a missed day starts it again without a word.
 - [Testing](#testing)
 - [Building for release](#building-for-release)
 - [Releasing](#releasing)
+- [Website](#website)
 - [Accessibility](#accessibility)
 - [Privacy](#privacy)
 - [Licences](#licences)
@@ -474,6 +475,7 @@ tool/
   new_keystore.ps1
 fastlane/metadata/android/
                 Google Play listing: text, graphics, release notes
+website/        The public website (ASP.NET Core 10) — see website/README.md
 ```
 
 ## Architecture
@@ -747,6 +749,17 @@ Play asks for is [`PRIVACY.md`](PRIVACY.md).
 
 The APK on a GitHub Release is signed differently from the one Play delivers,
 so a phone cannot move from one to the other without uninstalling.
+
+## Website
+
+[`website/`](website/) is the app's public site, in ASP.NET Core 10: the
+features with screenshots, download badges for Google Play and the App Store,
+the whole Qur'an to read in every edition the app ships (word by word
+included), a contact form that emails you, and the privacy policy Play asks
+for at `/privacy`. It reads `assets/data`, `PRIVACY.md` and `CHANGELOG.md`
+straight from this repository, so it never says something different from the
+app. See [`website/README.md`](website/README.md) for running, configuring
+and deploying it.
 
 ## Accessibility
 

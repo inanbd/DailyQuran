@@ -1,0 +1,4 @@
+@model PhoneShot
+<figure class="phone @Model.CssClass">
+    <img src="@Url.Content($"~/img/screens/{Model.File}")" alt="@Model.Alt" width="1080" height="2160" loading="@(Model.Eager ? "eager" : "lazy")" decoding="async">
+</figure>

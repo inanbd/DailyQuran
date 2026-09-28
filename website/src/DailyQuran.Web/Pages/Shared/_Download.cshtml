@@ -1,0 +1,19 @@
+@{
+    string apk = SiteSettings.Value.Stores.Apk;
+}
+<section class="section download" id="download" aria-labelledby="download-title">
+    <div class="container narrow center reveal">
+        <img class="download-icon" src="~/img/icon.svg" alt="" width="96" height="96">
+        <p class="eyebrow centered">Download</p>
+        <h2 id="download-title">Keep the Qur’an in your day</h2>
+        <p class="lead">
+            One ayah a day, or a date to finish the whole Qur’an by — with gentle reminders,
+            no account, no ads and nothing to sign up for.
+        </p>
+        <partial name="_StoreBadges" />
+        @if (apk.Length > 0)
+        {
+            <p class="small-print">On Android without Google Play? <a href="@apk">Download the APK</a> from the latest release.</p>
+        }
+    </div>
+</section>

@@ -1,0 +1,30 @@
+# Builds the website and runs its tests whenever the site, or the Qur'an data
+# and documents it reads from the rest of the repository, change.
+name: Website
+
+on:
+  push:
+    paths:
+      - website/**
+      - assets/data/**
+      - PRIVACY.md
+      - CHANGELOG.md
+      - .github/workflows/website.yml
+  pull_request:
+    paths:
+      - website/**
+      - assets/data/**
+      - PRIVACY.md
+      - CHANGELOG.md
+      - .github/workflows/website.yml
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test website/DailyQuran.Web.slnx

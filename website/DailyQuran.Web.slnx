@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DailyQuran.Web/DailyQuran.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DailyQuran.Web.Tests/DailyQuran.Web.Tests.csproj" />
+  </Folder>
+</Solution>

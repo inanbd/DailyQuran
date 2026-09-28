@@ -1,0 +1,305 @@
+@page "/features"
+@model FeaturesModel
+@{
+    ViewData["Title"] = "Features";
+    ViewData["Description"] = "Everything Daily Quran does: one ayah at a time, the Qur’an Planner, seven editions in six languages, word by word, reading time and streaks, and reminders that respect your privacy.";
+    ViewData["Nav"] = "features";
+}
+
+<section class="band page-hero" aria-labelledby="page-title">
+    <div class="container narrow center">
+        <p class="eyebrow centered">Features</p>
+        <h1 id="page-title">Made for a quiet, steady practice</h1>
+        <p class="lead">Everything in Daily Quran serves one aim: to help you keep the Qur’an in your day — gently, and without distraction.</p>
+        <nav class="chip-nav" aria-label="On this page">
+            <a class="chip" href="#reading">Reading</a>
+            <a class="chip" href="#planner">Planner</a>
+            <a class="chip" href="#translations">Translations</a>
+            <a class="chip" href="#word-by-word">Word by word</a>
+            <a class="chip" href="#progress">Progress</a>
+            <a class="chip" href="#reminders">Reminders</a>
+            <a class="chip" href="#listening">Listening</a>
+            <a class="chip" href="#comfort">Comfort</a>
+        </nav>
+    </div>
+</section>
+
+<section class="feature-row" id="reading" aria-labelledby="reading-title">
+    <div class="container feature-row-inner">
+        <div class="feature-copy reveal">
+            <p class="eyebrow">Reading</p>
+            <h2 id="reading-title">One ayah at a time</h2>
+            <p class="lead">Each ayah on its own page: the Arabic in Uthmani script, its translation beneath, and space to reflect.</p>
+            <ul class="points">
+                <li>
+                    <h3>Your place, kept faithfully</h3>
+                    <p>Close the app mid-surah and it opens where you were. Miss a fortnight and it returns to the first ayah you have not read — never the fourteenth.</p>
+                </li>
+                <li>
+                    <h3>Nothing is marked read unless you read it</h3>
+                    <p>Tap <em>Mark as read</em>, or simply stay with an ayah until its end has been on screen for a few seconds. Swiping past on the way to the next one does not count.</p>
+                </li>
+                <li>
+                    <h3>Turn the page like a mushaf</h3>
+                    <p>Swipe between ayat, or jump anywhere from the surah index. Browsing never marks anything read.</p>
+                </li>
+                <li>
+                    <h3>Two translations together</h3>
+                    <p>Add a second translation to read beneath the first, and save any ayah to your Favourites.</p>
+                </li>
+            </ul>
+        </div>
+        <div class="feature-visual reveal">
+            <partial name="_Phone" model="@PhoneShot.Read.With("", eager: true)" />
+        </div>
+    </div>
+</section>
+
+<section class="feature-row is-flipped tinted" id="planner" aria-labelledby="planner-title">
+    <div class="container feature-row-inner">
+        <div class="feature-copy reveal">
+            <p class="eyebrow">The Qur’an Planner</p>
+            <h2 id="planner-title">Finish the whole Qur’an by a day you choose</h2>
+            <p class="lead">Pick a finish date and the planner does the arithmetic — how many ayat a day, and roughly how long that takes.</p>
+            <ul class="plan-options">
+                <li><strong>Finish in 1 month</strong><span>about 202 ayat a day</span></li>
+                <li><strong>Finish in 1 year</strong><span>about 18 ayat a day</span></li>
+                <li><strong>Pick a date</strong><span>up to five years out</span></li>
+            </ul>
+            <ul class="points">
+                <li>
+                    <h3>A goal that adjusts itself</h3>
+                    <p>Read more one day and the days after grow lighter. Miss a day and what is left is spread over the days remaining. Your finish date holds.</p>
+                </li>
+                <li>
+                    <h3>Today’s goal, first</h3>
+                    <p>Your plan has its own reminder. Tap it to see how much to read today, how much is done and where you will start — then <em>Continue reading</em>.</p>
+                </li>
+                <li>
+                    <h3>Kept apart from your Daily Ayah</h3>
+                    <p>Your plan and your Daily Ayah each keep their own place, so reading one never counts for — or against — the other.</p>
+                </li>
+                <li>
+                    <h3>Start over, kindly</h3>
+                    <p>Plan again from today and keep what you have read, begin again from the first ayah, or stop the plan. None of it touches your Daily Ayah.</p>
+                </li>
+            </ul>
+        </div>
+        <div class="feature-visual reveal">
+            <partial name="_Phone" model="PhoneShot.Planner" />
+        </div>
+    </div>
+</section>
+
+<section class="feature-row" id="translations" aria-labelledby="translations-title">
+    <div class="container feature-row-inner">
+        <div class="feature-copy reveal">
+            <p class="eyebrow">Translations</p>
+            <h2 id="translations-title">Seven editions, six languages</h2>
+            <p class="lead">The Uthmani Arabic on its own, or with a translation in the language you read best. Change at any time and stay on the same ayah — your place belongs to the ayah, not the translator.</p>
+            <ul class="edition-list">
+                @foreach (Edition edition in Model.Translations)
+                {
+                    <li>
+                        <span class="edition-language">@edition.LanguageDisplay</span>
+                        <span class="edition-name">@edition.Translator</span>
+                    </li>
+                }
+                @if (Model.ArabicOnly is not null)
+                {
+                    <li>
+                        <span class="edition-language">Arabic only</span>
+                        <span class="edition-name">Uthmani script</span>
+                    </li>
+                }
+            </ul>
+            <p class="note">
+                Every text is copied verbatim from its source and credited by name — never generated,
+                paraphrased or corrected. <a href="/sources">See the sources</a>.
+            </p>
+        </div>
+        <div class="feature-visual reveal">
+            <partial name="_Phone" model="PhoneShot.Library" />
+        </div>
+    </div>
+</section>
+
+<section class="feature-row is-flipped tinted" id="word-by-word" aria-labelledby="wbw-title">
+    <div class="container feature-row-inner">
+        <div class="feature-copy reveal">
+            <p class="eyebrow">Word by word</p>
+            <h2 id="wbw-title">Every word, and what it means</h2>
+            <p class="lead">Turn on word by word and each Arabic word is shown with its meaning, in the Arabic’s own right-to-left order.</p>
+            <ul class="points">
+                <li>
+                    <h3>A reading aid, not a second translation</h3>
+                    <p>A gloss says what one word means on its own; the ayah’s translation, always shown beneath, says what the ayah means. The two are kept visibly distinct.</p>
+                </li>
+                <li>
+                    <h3>Try it here</h3>
+                    <p>Word by word works on this website too. <a href="/quran/1?wbw=1">Open Al-Fatihah word by word</a>.</p>
+                </li>
+            </ul>
+        </div>
+        <div class="feature-visual reveal">
+            @if (Model.WordSample is { Words: { } words } sample)
+            {
+                <figure class="sample-card">
+                    <ol class="wbw" lang="ar" dir="rtl">
+                        @foreach (Word word in words)
+                        {
+                            <li>
+                                <span class="w-ar">@word.Arabic</span>
+                                <span class="w-gl" lang="en" dir="ltr">@word.Gloss</span>
+                            </li>
+                        }
+                    </ol>
+                    @if (sample.Translation is { } translation)
+                    {
+                        <p class="translation" lang="@Model.SampleEdition.LanguageCode" dir="@Model.SampleEdition.Direction">@translation</p>
+                    }
+                    <figcaption>@sample.Reference · @Model.SampleEdition.ShortTitle</figcaption>
+                </figure>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="feature-row" id="progress" aria-labelledby="progress-title">
+    <div class="container feature-row-inner">
+        <div class="feature-copy reveal">
+            <p class="eyebrow">Progress</p>
+            <h2 id="progress-title">A streak that only ever praises</h2>
+            <p class="lead">Set a daily reading time and watch the days add up. The app notices when you keep at it — and never remarks on a day you missed.</p>
+            <ul class="points">
+                <li>
+                    <h3>Reading time, honestly measured</h3>
+                    <p>Choose anywhere from 5 to 60 minutes a day. Time counts only while an ayah is on screen and you are with it — a phone left open overnight is not eight hours of reading.</p>
+                </li>
+                <li>
+                    <h3>Your week at a glance</h3>
+                    <p>Your streak, today’s reading time, the last seven days, and how this week compares with the one before.</p>
+                </li>
+                <li>
+                    <h3>Congratulations, when they are earned</h3>
+                    <p>Every three days in a row, every tenth of the Qur’an, when you reach your reading time, and when you read longer than the day before. Each is said once — and they can be turned off.</p>
+                </li>
+            </ul>
+        </div>
+        <div class="feature-visual reveal">
+            <partial name="_Phone" model="PhoneShot.Progress" />
+        </div>
+    </div>
+</section>
+
+<section class="feature-row is-flipped tinted" id="reminders" aria-labelledby="reminders-title">
+    <div class="container feature-row-inner">
+        <div class="feature-copy reveal">
+            <p class="eyebrow">Reminders</p>
+            <h2 id="reminders-title">Reminders that respect you</h2>
+            <p class="lead">A gentle prompt at the times you choose — every day, every other day, on the days you pick, or once a week.</p>
+            <ul class="points">
+                <li>
+                    <h3>Up to five a day</h3>
+                    <p>The first brings your next ayah; the later ones are soft nudges that fall quiet once you have read.</p>
+                </li>
+                <li>
+                    <h3>Your lock screen, your choice</h3>
+                    <p>A notification can be read by whoever glances at your phone, so you decide how much it says:</p>
+                    <ol class="ladder">
+                        <li><strong>Just an invitation</strong><span>“Your next ayah is ready.” — the default</span></li>
+                        <li><strong>Which ayah is next</strong><span>A reference, such as “Al-Baqarah 2:255”</span></li>
+                        <li><strong>The translation</strong><span>The ayah’s translation</span></li>
+                        <li><strong>The Arabic</strong><span>The ayah itself</span></li>
+                    </ol>
+                </li>
+                <li>
+                    <h3>Asked for only when needed</h3>
+                    <p>No permission is requested until you have chosen a reminder time, and declining one only makes reminders less punctual. Times follow your phone’s clock through travel and daylight saving.</p>
+                </li>
+            </ul>
+        </div>
+        <div class="feature-visual reveal">
+            <partial name="_Phone" model="PhoneShot.Reminders" />
+        </div>
+    </div>
+</section>
+
+<section class="section listening" id="listening" aria-labelledby="listening-title">
+    <div class="container">
+        <div class="listen-card reveal">
+            <span class="listen-icon">@Icon.Volume</span>
+            <div>
+                <p class="eyebrow">Listening</p>
+                <h2 id="listening-title">Hear the translation read aloud</h2>
+                <p>
+                    The app can read a translation aloud in your phone’s own voice for its language —
+                    French in a French voice, Urdu in an Urdu one.
+                </p>
+                <p class="listen-note">
+                    The Arabic is never read by a machine. Recitation of the Qur’an has its own discipline,
+                    the rules of tajwid, which a text-to-speech voice neither knows nor follows — so there
+                    is deliberately no button for it.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section comfort tinted" id="comfort" aria-labelledby="comfort-title">
+    <div class="container">
+        <div class="section-head center reveal">
+            <p class="eyebrow centered">Comfort</p>
+            <h2 id="comfort-title">Comfortable for every reader</h2>
+        </div>
+        <ul class="feature-cards">
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Moon</span>
+                <h3>Light and dark</h3>
+                <p>Warm paper by day and a deep, quiet dark by night, following your phone or your choice.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.TextSize</span>
+                <h3>Text that grows with you</h3>
+                <p>The reading size multiplies your phone’s own text size, so accessibility settings keep working.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Book</span>
+                <h3>Right to left, done right</h3>
+                <p>Arabic and Urdu are laid out right to left, with generous spacing for the marks of Qur’anic orthography.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Check</span>
+                <h3>Clear for screen readers</h3>
+                <p>Each word and its meaning, each progress bar and each translation is announced as one clear sentence, and every control is easy to tap.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Heart</span>
+                <h3>Favourites</h3>
+                <p>Keep the ayat that move you, in whichever translation you read them.</p>
+            </li>
+            <li class="feature-card reveal">
+                <span class="feature-icon">@Icon.Phone</span>
+                <h3>Works offline</h3>
+                <p>The whole Qur’an, every translation and every word is on your phone. Read on a plane, or anywhere.</p>
+            </li>
+        </ul>
+    </div>
+</section>
+
+<partial name="_Principles" />
+
+@if (Model.LatestRelease is { } release)
+{
+    <section class="section whats-new" aria-labelledby="new-title">
+        <div class="container narrow">
+            <div class="release-card reveal">
+                <p class="eyebrow">What’s new</p>
+                <h2 id="new-title">Version @release.Version</h2>
+                <div class="prose">@release.Html</div>
+            </div>
+        </div>
+    </section>
+}
+
+<partial name="_Download" />

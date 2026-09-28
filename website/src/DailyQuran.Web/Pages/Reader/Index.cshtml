@@ -1,0 +1,83 @@
+@page "/quran"
+@model DailyQuran.Web.Pages.Reader.IndexModel
+@{
+    ViewData["Title"] = "Read the Qur’an";
+    ViewData["Description"] = "Read all 114 surahs of the Qur’an in the Uthmani script, with English, Urdu, Bengali, French, Spanish or Russian translation, or word by word. Free, with no account.";
+    ViewData["Nav"] = "quran";
+    ViewData["Canonical"] = "/quran";
+}
+
+<section class="band page-hero" aria-labelledby="page-title">
+    <div class="container narrow center">
+        <p class="eyebrow centered">The Noble Qur’an</p>
+        <h1 id="page-title">Read the Qur’an</h1>
+        <p class="lead">
+            All 114 surahs in the Uthmani script, with your choice of translation — or the Arabic alone.
+            Pick up where you left off, on any device.
+        </p>
+    </div>
+</section>
+
+<section class="section surah-index" data-surah-index>
+    <div class="container">
+        <div class="index-tools">
+            <form class="search-field" role="search" data-surah-search-form>
+                <label class="visually-hidden" for="surah-search">Find a surah</label>
+                @Icon.Search
+                <input id="surah-search" type="search" autocomplete="off" spellcheck="false"
+                       placeholder="Search by name or number, or go to 2:255" data-surah-search>
+            </form>
+            <form class="edition-picker" method="get" action="/quran" data-autosubmit>
+                <label for="edition">Translation</label>
+                <span class="select">
+                    <select id="edition" name="t">
+                        @foreach (Edition edition in Model.Editions)
+                        {
+                            <option value="@edition.Id" selected="@(edition.Id == Model.Preferences.Edition.Id)">@edition.Label</option>
+                        }
+                    </select>
+                    @Icon.ChevronDown
+                </span>
+                <noscript><button class="btn btn-small btn-primary" type="submit">Apply</button></noscript>
+            </form>
+        </div>
+
+        <a class="continue-card" href="/quran" hidden data-continue>
+            <span class="continue-icon">@Icon.Bookmark</span>
+            <span class="continue-text">
+                <span class="continue-label">Continue reading</span>
+                <span class="continue-where" data-continue-label></span>
+            </span>
+            @Icon.ArrowRight
+        </a>
+
+        <ol class="surah-grid" data-surah-list>
+            @foreach (Surah surah in Model.Surahs)
+            {
+                <li data-search="@surah.Number @surah.NameTransliterated @surah.NameEnglish @surah.NameArabic" data-number="@surah.Number">
+                    <a class="surah-card" href="/quran/@surah.Number">
+                        <span class="surah-num">@surah.Number</span>
+                        <span class="surah-names">
+                            <span class="surah-name">@surah.NameTransliterated</span>
+                            <span class="surah-meaning">@surah.NameEnglish</span>
+                        </span>
+                        <span class="surah-side">
+                            <span class="surah-arabic" lang="ar" dir="rtl">@surah.NameArabic</span>
+                            <span class="surah-meta">@surah.RevelationLabel · @surah.AyahCountLabel</span>
+                        </span>
+                    </a>
+                </li>
+            }
+        </ol>
+        <p class="empty-state" hidden data-empty>No surah matches that. Try a name such as <em>Yasin</em>, a number, or an ayah such as <em>2:255</em>.</p>
+
+        <p class="attribution">
+            Reading in <strong>@Model.Preferences.Edition.Label</strong>.
+            Text copied verbatim from its source — <a href="/sources">see the sources and licences</a>.
+        </p>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/quran.js" asp-append-version="true" defer></script>
+}

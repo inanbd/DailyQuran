@@ -1,0 +1,233 @@
+@page "/quran/{surah:int}/{ayah:int?}"
+@model DailyQuran.Web.Pages.Reader.SurahModel
+@{
+    Surah surah = Model.Surah;
+    Edition edition = Model.Preferences.Edition;
+    string path = Model.Focus is { } focus ? $"/quran/{surah.Number}/{focus.Number}" : $"/quran/{surah.Number}";
+
+    ViewData["Title"] = Model.Focus is { } f
+        ? $"{surah.NameTransliterated} {f.Key}"
+        : $"Surah {surah.NameTransliterated} ({surah.NameEnglish})";
+    ViewData["Description"] = Model.Focus?.Translation is { } quoted
+        ? (quoted.Length > 155 ? quoted[..152].TrimEnd() + "…" : quoted)
+        : $"Read Surah {surah.NameTransliterated} ({surah.NameEnglish}), {surah.AyahCountLabel}, in the Uthmani Arabic{(edition.HasTranslation ? $" with the {edition.ShortTitle} {edition.LanguageName} translation" : "")} — or word by word. Free, with no account.";
+    ViewData["Canonical"] = edition.Id == Model.DefaultEdition.Id ? path : $"{path}?t={edition.Id}";
+    ViewData["Nav"] = "quran";
+    ViewData["BodyClass"] = "page-reader";
+}
+
+<section class="band surah-hero" aria-labelledby="surah-title">
+    <div class="container narrow center">
+        <nav class="crumbs" aria-label="Breadcrumb">
+            <a href="/quran">The Qur’an</a>
+            <span aria-hidden="true">/</span>
+            <span>Surah @surah.Number of @Model.Surahs.Count</span>
+        </nav>
+        <p class="surah-hero-arabic" lang="ar" dir="rtl">@surah.NameArabic</p>
+        <h1 id="surah-title">@surah.NameTransliterated</h1>
+        <p class="surah-hero-meta">
+            <span>@surah.NameEnglish</span>
+            @if (surah.RevelationLabel.Length > 0)
+            {
+                <span aria-hidden="true">·</span>
+                <span>@surah.RevelationLabel</span>
+            }
+            <span aria-hidden="true">·</span>
+            <span>@surah.AyahCountLabel</span>
+        </p>
+    </div>
+</section>
+
+<div class="reader-bar" data-reader-bar>
+    <div class="container reader-bar-inner">
+        <div class="reader-nav">
+            @if (Model.Previous is { } previous)
+            {
+                <a class="icon-btn" href="/quran/@previous.Number" aria-label="Previous surah: @previous.NameTransliterated">@Icon.ArrowLeft</a>
+            }
+            else
+            {
+                <span class="icon-btn is-disabled" aria-hidden="true">@Icon.ArrowLeft</span>
+            }
+            <label class="visually-hidden" for="surah-jump">Go to surah</label>
+            <span class="select select-quiet">
+                <select id="surah-jump" data-surah-jump>
+                    @foreach (Surah option in Model.Surahs)
+                    {
+                        <option value="@option.Number" selected="@(option.Number == surah.Number)">@option.Number. @option.NameTransliterated</option>
+                    }
+                </select>
+                @Icon.ChevronDown
+            </span>
+            @if (Model.Next is { } next)
+            {
+                <a class="icon-btn" href="/quran/@next.Number" aria-label="Next surah: @next.NameTransliterated">@Icon.ArrowRight</a>
+            }
+            else
+            {
+                <span class="icon-btn is-disabled" aria-hidden="true">@Icon.ArrowRight</span>
+            }
+        </div>
+
+        <form class="ayah-jump js-only" data-ayah-jump>
+            <label for="ayah-jump">Ayah</label>
+            <input id="ayah-jump" type="number" min="1" max="@surah.AyahCount" inputmode="numeric" placeholder="1–@surah.AyahCount">
+        </form>
+
+        <details class="reader-settings" data-settings>
+            <summary class="btn btn-outline btn-small">@Icon.Sliders <span class="summary-label">Reading settings</span></summary>
+            <div class="settings-panel">
+                <form method="get" action="/quran/@surah.Number" data-autosubmit data-keep-place>
+                    <div class="setting">
+                        <label class="setting-label" for="edition">Translation</label>
+                        <span class="select">
+                            <select id="edition" name="t">
+                                @foreach (Edition option in Model.Editions)
+                                {
+                                    <option value="@option.Id" selected="@(option.Id == edition.Id)">@option.Label</option>
+                                }
+                            </select>
+                            @Icon.ChevronDown
+                        </span>
+                    </div>
+                    @if (Model.WordByWordAvailable)
+                    {
+                        <div class="setting">
+                            <input type="hidden" name="wbw" value="0">
+                            <label class="switch">
+                                <input type="checkbox" name="wbw" value="1" checked="@Model.Preferences.WordByWord">
+                                <span class="switch-track" aria-hidden="true"></span>
+                                <span>Word by word</span>
+                            </label>
+                        </div>
+                    }
+                    <noscript><button class="btn btn-small btn-primary" type="submit">Apply</button></noscript>
+                </form>
+
+                <div class="js-only">
+                    <div class="setting">
+                        <span class="setting-label" id="show-label">Show</span>
+                        <div class="segmented" role="group" aria-labelledby="show-label">
+                            <button type="button" data-show="arabic" aria-pressed="true">Arabic</button>
+                            @if (edition.HasTranslation)
+                            {
+                                <button type="button" data-show="translation" aria-pressed="true">Translation</button>
+                            }
+                        </div>
+                    </div>
+                    <div class="setting">
+                        <span class="setting-label" id="script-label">Arabic typeface</span>
+                        <div class="segmented" role="group" aria-labelledby="script-label">
+                            <button type="button" data-script-set="naskh" aria-pressed="false">Naskh</button>
+                            <button type="button" data-script-set="amiri" aria-pressed="false">Amiri</button>
+                        </div>
+                    </div>
+                    <div class="setting">
+                        <span class="setting-label" id="size-label">Text size</span>
+                        <div class="stepper" role="group" aria-labelledby="size-label">
+                            <button type="button" data-size="-1" aria-label="Smaller text">A−</button>
+                            <output data-size-value aria-live="polite">100%</output>
+                            <button type="button" data-size="1" aria-label="Larger text">A+</button>
+                        </div>
+                    </div>
+                    <div class="setting">
+                        <span class="setting-label" id="theme-label">Theme</span>
+                        <div class="segmented" role="group" aria-labelledby="theme-label">
+                            <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+                            <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+                            <button type="button" data-theme-set="auto" aria-pressed="false">Auto</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </details>
+    </div>
+    <div class="reader-progress" aria-hidden="true"><span data-progress></span></div>
+</div>
+
+<section class="reader" data-reader
+         data-surah="@surah.Number"
+         data-surah-name="@surah.NameTransliterated"
+         data-focus="@Model.Focus?.Number"
+         data-has-translation="@(edition.HasTranslation ? "true" : "false")"
+         aria-label="@surah.NameTransliterated">
+    <div class="container reading">
+        @if (Model.Basmala is { } basmala)
+        {
+            <p class="basmala" lang="ar" dir="rtl">@basmala</p>
+        }
+
+        <ol class="ayat">
+            @foreach (AyahText ayah in Model.Ayat)
+            {
+                <li class="ayah" id="a@(ayah.Number)" data-ayah="@ayah.Number">
+                    <div class="ayah-head">
+                        <a class="ayah-num" href="/quran/@surah.Number/@ayah.Number" aria-label="Ayah @ayah.Key">@ayah.Number</a>
+                        <div class="ayah-tools js-only">
+                            <button type="button" class="icon-btn" data-copy aria-label="Copy ayah @ayah.Key">@Icon.Copy</button>
+                            <button type="button" class="icon-btn" data-share aria-label="Copy a link to ayah @ayah.Key">@Icon.Link</button>
+                        </div>
+                    </div>
+                    @if (ayah.Words is { } words)
+                    {
+                        <ol class="wbw" lang="ar" dir="rtl">
+                            @foreach (Word word in words)
+                            {
+                                <li>
+                                    <span class="w-ar">@word.Arabic</span>
+                                    <span class="w-gl" lang="en" dir="ltr">@word.Gloss</span>
+                                </li>
+                            }
+                        </ol>
+                    }
+                    else
+                    {
+                        <p class="arabic" lang="ar" dir="rtl">@ayah.Arabic</p>
+                    }
+                    @if (ayah.Translation is { } translation)
+                    {
+                        <p class="translation" lang="@edition.LanguageCode" dir="@edition.Direction">@translation</p>
+                    }
+                </li>
+            }
+        </ol>
+
+        <div class="ornament" aria-hidden="true"><span></span></div>
+
+        <nav class="surah-pager" aria-label="More surahs">
+            @if (Model.Previous is { } before)
+            {
+                <a class="pager-card is-previous" href="/quran/@before.Number">
+                    <span class="pager-dir">@Icon.ArrowLeft Previous</span>
+                    <span class="pager-name">@before.NameTransliterated</span>
+                    <span class="pager-arabic" lang="ar" dir="rtl">@before.NameArabic</span>
+                </a>
+            }
+            @if (Model.Next is { } after)
+            {
+                <a class="pager-card is-next" href="/quran/@after.Number">
+                    <span class="pager-dir">Next @Icon.ArrowRight</span>
+                    <span class="pager-name">@after.NameTransliterated</span>
+                    <span class="pager-arabic" lang="ar" dir="rtl">@after.NameArabic</span>
+                </a>
+            }
+        </nav>
+
+        <p class="attribution">
+            @if (edition.HasTranslation)
+            {
+                <text>Translation by @edition.Translator. </text>
+            }
+            Text from @edition.Source.Name, @(edition.Source.Licence ?? "used with permission"), copied verbatim.
+            @if (Model.Preferences.WordByWord && Model.WordIndex is { } wordIndex)
+            {
+                <text>Word glosses from @wordIndex.Source.Name — a reading aid, not a translation. </text>
+            }
+            <a href="/sources">Sources and licences</a>.
+        </p>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/quran.js" asp-append-version="true" defer></script>
+}

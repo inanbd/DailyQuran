@@ -1,0 +1,52 @@
+@page "/privacy"
+@inject SiteContent SiteText
+@{
+    ViewData["Title"] = "Privacy";
+    ViewData["Description"] = "Daily Quran collects no personal information: no account, no ads, no analytics. The privacy policy for the app and this website.";
+    ViewData["Canonical"] = "/privacy";
+}
+
+<section class="band page-hero" aria-labelledby="page-title">
+    <div class="container narrow center">
+        <p class="eyebrow centered">Privacy</p>
+        <h1 id="page-title">Nothing about you leaves your hands</h1>
+        <p class="lead">No account, no advertising, no analytics — in the app or on this website.</p>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container narrow">
+        <article class="prose">
+            <h2>This website</h2>
+            <p>
+                This website has no accounts, no advertising and no analytics, and it makes no requests
+                to anyone else: its fonts and images are served from here.
+            </p>
+            <ul>
+                <li>
+                    <strong>Your reading settings</strong> — text size, typeface, theme, and the place you last
+                    read — are kept in your own browser, and never sent to us.
+                </li>
+                <li>
+                    <strong>One small cookie</strong>, <code>dq_reader</code>, remembers the translation you chose
+                    and whether you read word by word, so the next surah opens the same way. It is set only
+                    when you change one of those, and holds nothing else.
+                </li>
+                <li>
+                    <strong>The contact form</strong> sets a security cookie to protect the form from forgery.
+                    What you write, with your name and email address, is emailed to us and used only to
+                    reply to you. This website keeps no copy of it.
+                </li>
+                <li>
+                    <strong>Like any website</strong>, the server that hosts it may keep brief technical logs —
+                    such as the address a request came from, and when — to keep the site running and secure.
+                </li>
+            </ul>
+
+            <div class="ornament" aria-hidden="true"><span></span></div>
+
+            <h2>The Daily Quran app</h2>
+            @SiteText.PrivacyPolicy
+        </article>
+    </div>
+</section>

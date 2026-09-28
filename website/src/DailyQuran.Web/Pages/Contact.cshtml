@@ -1,0 +1,130 @@
+@page "/contact"
+@model ContactModel
+@{
+    ViewData["Title"] = "Contact us";
+    ViewData["Description"] = "Questions, suggestions, or a mistake you have noticed? Write to the makers of Daily Quran.";
+    ViewData["Nav"] = "contact";
+    ViewData["Canonical"] = "/contact";
+    string source = SiteSettings.Value.SourceCodeUrl;
+}
+
+<section class="band page-hero" aria-labelledby="page-title">
+    <div class="container narrow center">
+        <p class="eyebrow centered">Contact</p>
+        <h1 id="page-title">We would love to hear from you</h1>
+        <p class="lead">Questions, suggestions, or a mistake you have noticed — every message is read.</p>
+    </div>
+</section>
+
+<section class="section contact">
+    <div class="container contact-layout">
+        <aside class="contact-aside">
+            <h2>Write to us</h2>
+            <p>Your message comes straight to us by email, and we reply to the address you give.</p>
+            <ul class="aside-points">
+                @if (Model.AppInTesting)
+                {
+                    <li>
+                        <span class="aside-icon">@Icon.Phone</span>
+                        <span><strong>Want the Android app?</strong> It is in internal testing on Google Play. Choose <em>@ContactTopic.AppAccess.Label</em> and tell us the Google account on your phone, and we will add you as a tester.</span>
+                    </li>
+                }
+                <li>
+                    <span class="aside-icon">@Icon.Mail</span>
+                    <span><strong>Sent by email.</strong> This website keeps no copy of what you write.</span>
+                </li>
+                <li>
+                    <span class="aside-icon">@Icon.Shield</span>
+                    <span><strong>Used only to reply.</strong> Your address is never added to a list or shared.</span>
+                </li>
+                <li>
+                    <span class="aside-icon">@Icon.Book</span>
+                    <span><strong>About the text?</strong> Tell us the surah and ayah, and which translation, and we will check it against its source.</span>
+                </li>
+            </ul>
+            @if (source.Length > 0)
+            {
+                <p class="aside-note">Found a bug? You can also <a href="@source.TrimEnd('/')/issues">open an issue on GitHub</a>.</p>
+            }
+        </aside>
+
+        <div class="contact-card">
+            @if (Model.Sent)
+            {
+                <div class="sent" role="status">
+                    <span class="sent-icon">@Icon.Check</span>
+                    <h2>Thank you — your message is on its way</h2>
+                    <p>JazakAllahu khayran for writing. We will reply to the address you gave as soon as we can.</p>
+                    <a class="btn btn-outline" href="/">Back to the home page</a>
+                </div>
+            }
+            else
+            {
+                @if (Model.Busy)
+                {
+                    <p class="notice" role="alert">You have sent several messages in a short time. Please wait a few minutes before sending another.</p>
+                }
+                @if (Model.Problem is { } problem)
+                {
+                    <p class="notice" role="alert">@problem</p>
+                }
+                else if (!Model.IsAvailable)
+                {
+                    <p class="notice">Messages can’t be sent from this page just now.@if (source.Length > 0){<text> Meanwhile, you can <a href="@source.TrimEnd('/')/issues">reach us on GitHub</a>.</text>}</p>
+                }
+
+                <form method="post" class="contact-form" novalidate>
+                    <div asp-validation-summary="ModelOnly" class="form-summary"></div>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label asp-for="Input.Name">Your name</label>
+                            <input asp-for="Input.Name" autocomplete="name" required maxlength="100">
+                            <span asp-validation-for="Input.Name" class="field-error"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="Input.Email">Email address</label>
+                            <input asp-for="Input.Email" type="email" autocomplete="email" required maxlength="254" spellcheck="false">
+                            <span asp-validation-for="Input.Email" class="field-error"></span>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label asp-for="Input.Topic">What is it about?</label>
+                        <span class="select">
+                            <select asp-for="Input.Topic">
+                                @foreach (ContactTopic topic in Model.Topics)
+                                {
+                                    <option value="@topic.Key">@topic.Label</option>
+                                }
+                            </select>
+                            @Icon.ChevronDown
+                        </span>
+                        <span asp-validation-for="Input.Topic" class="field-error"></span>
+                        @if (Model.AppInTesting)
+                        {
+                            <p class="topic-hint">Please include the Google account (the Gmail address) you use on your Android phone — that is the address we add to the testers list.</p>
+                        }
+                    </div>
+
+                    <div class="field">
+                        <label asp-for="Input.Message">Your message</label>
+                        <textarea asp-for="Input.Message" rows="7" required minlength="10" maxlength="5000"></textarea>
+                        <span asp-validation-for="Input.Message" class="field-error"></span>
+                    </div>
+
+                    <div class="hp" aria-hidden="true">
+                        <label for="website">Leave this empty</label>
+                        <input id="website" name="Website" type="text" tabindex="-1" autocomplete="off" value="">
+                    </div>
+                    <input type="hidden" asp-for="FormToken">
+
+                    <div class="form-actions">
+                        <button class="btn btn-primary" type="submit">@Icon.Mail Send message</button>
+                        <p class="small-print">By sending, you agree we may use your name and email to reply. See our <a href="/privacy">privacy policy</a>.</p>
+                    </div>
+                </form>
+            }
+        </div>
+    </div>
+</section>

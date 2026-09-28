@@ -1,0 +1,9 @@
+# The build context is the repository root; send only what the site needs.
+*
+!assets/data/**
+!PRIVACY.md
+!CHANGELOG.md
+!website/src/**
+**/bin
+**/obj
+**/App_Data
